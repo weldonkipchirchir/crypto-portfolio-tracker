@@ -3,3 +3,5 @@
 .market-table-wrap{max-height:72vh}.market-table-wrap thead th{position:sticky;top:0;background:var(--panel);z-index:2}.market-supply-label{font-size:10px;color:var(--muted);line-height:1.7}.market-supply-label progress{width:100%;height:8px;accent-color:var(--green);margin-top:7px}
 
 .market-chart-types{display:flex;gap:6px}.market-chart-types button{font-size:11px;padding:8px 11px}.market-chart-types button[aria-pressed=true]{background:var(--green);color:#182513}.market-ranges{flex-wrap:wrap}.market-candle.up{fill:var(--green);stroke:var(--green)}.market-candle.down{fill:#f08d88;stroke:#f08d88}.market-candle line{stroke-width:1;vector-effect:non-scaling-stroke}.market-news-list{list-style:none;padding:0;display:grid;gap:16px}.market-news-list li{padding-bottom:16px;border-bottom:1px solid var(--line);line-height:1.6}.market-news-list small{display:block;color:var(--muted);margin-top:7px;font-size:11px}
+
+.market-zoom{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.market-zoom button{font-size:11px;padding:7px 10px}.market-zoom p{flex-basis:100%;margin:3px 0 0}

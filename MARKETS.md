@@ -41,3 +41,12 @@ Additional official research:
 - https://newsapi.org/pricing
 
 Regression coverage: `python -m unittest test_coin_market test_market_news test_markets_api -q`, `node market_dashboard.test.cjs`; real CoinGecko Bitcoin1D OHLC returned48candles and ALLline returned366dailyobservations during implementation.
+
+
+## Local chart viewport
+Zoom in/out, Reset zoom, Earlier and Later operate on validated loaded observations for both chart styles, without extra provider requests. The chart rescales to the visible rows and shows visible/loaded counts and exact visible period. The minimum viewport is five observations (or the complete dataset if smaller). Coin, range and chart-type changes reset the viewport. This magnifies existing data; it does not create finer-grained candles or extend provider history. Regression checks cover zoom limits, pan bounds, reset and no additional provider calls.
+
+Longer-history alternatives researched: Binance spot `/api/v3/klines` and Coinbase Exchange product candles accept paged historical time ranges. These are individual exchange/pair histories, limited by listing date and data gaps; neither promises lifetime history for all250coins. Binance has per-request/rate limits; Coinbase documents300candles per request and missing intervals without trades. TradingView hosted widgets provide their own data with instrument restrictions; Advanced Charts/Lightweight Charts libraries do not include market data. No additional data vendor is enabled by this viewport update.
+- https://developers.binance.com/docs/binance-spot-api-docs/rest-api/market-data-endpoints
+- https://docs.cdp.coinbase.com/api-reference/exchange-api/rest-api/products/get-product-candles
+- https://www.tradingview.com/charting-library-docs/latest/connecting_data/datafeed-api/
