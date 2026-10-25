@@ -14,6 +14,19 @@ class CloudTests(base.APITests):
  def test_advanced_api_watchlist(self):
   import test_advanced_api
   test_advanced_api.AdvancedAPITests.test_watchlist_only_owns_identity_and_reversible(self)
+ def test_targets_authority_and_account_isolation(self):
+  import test_targets_api
+  # Use the target fixture to mark a genuine eligible provider quote.
+  original=self.owned_wallet
+  self.owned_wallet=lambda:test_targets_api.TargetsAPITests.owned_wallet(self)
+  try:test_targets_api.TargetsAPITests.test_targets_authority_and_account_isolation(self)
+  finally:self.owned_wallet=original
+ def test_targets_refresh(self):
+  import test_targets_api
+  original=self.owned_wallet
+  self.owned_wallet=lambda:test_targets_api.TargetsAPITests.owned_wallet(self)
+  try:test_targets_api.TargetsAPITests.test_price_refresh_evaluates_without_duplicates(self)
+  finally:self.owned_wallet=original
  def test_concurrent_sales_cannot_oversell(self):
   import test_features
   test_features.FeatureAPITests.test_concurrent_sales_cannot_oversell(self)

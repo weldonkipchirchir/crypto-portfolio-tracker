@@ -79,3 +79,6 @@ Full hosted deployment uses the included Python function and PostgreSQL adapter;
 
 ## Research-led Insights
 Insights adds account-saved wallet-value checkpoints, a contract-based holdings watchlist and an asset research dialog with selected-pool liquidity, volume and 24-hour movement. The chart starts from real saved observations; its change is not investment return. See ADVANCED_FEATURES.md for scope, research references, storage bounds and validation. Run `node advanced_dashboard.test.cjs` alongside existing checks.
+
+## USD price targets
+Targets adds recurring inclusive price conditions and an account event history, evaluated on explicit price refresh or target creation. It uses fresh provider quotes and exact contract identities; it does not monitor in the background or send email/push. See PRICE_TARGETS.md for research, limits and validation.
