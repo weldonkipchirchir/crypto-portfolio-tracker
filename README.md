@@ -76,3 +76,6 @@ Token holdings display indicative USD unit prices and values from DEX Screener, 
 
 ## GitHub / Vercel
 Full hosted deployment uses the included Python function and PostgreSQL adapter; see DEPLOYMENT.md for required environment variables, owner registration restriction and preview validation. Local SQLite remains the default when DATABASE_URL is absent. Local financial records are never bundled for deployment.
+
+## Research-led Insights
+Insights adds account-saved wallet-value checkpoints, a contract-based holdings watchlist and an asset research dialog with selected-pool liquidity, volume and 24-hour movement. The chart starts from real saved observations; its change is not investment return. See ADVANCED_FEATURES.md for scope, research references, storage bounds and validation. Run `node advanced_dashboard.test.cjs` alongside existing checks.

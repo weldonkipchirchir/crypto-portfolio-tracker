@@ -4,7 +4,7 @@
 Local runs keep using portfolio.sqlite3. When DATABASE_URL is configured, the app uses PostgreSQL. Hosted mode refuses to use temporary SQLite storage. Local accounts, sessions, wallets and trades are excluded from Git and deployment; the hosted app starts with a fresh database. No automatic upload of local financial records occurs.
 
 ## Required Vercel setup
-1. Import weldonkipchirchir/crypto-portfolio-tracker. Framework: Other. Root: repository root. Use the included vercel.json and Python 3.12 runtime. The public output directory is deliberately empty: the Python handler serves only four explicit frontend routes and authenticated API endpoints.
+1. Import weldonkipchirchir/crypto-portfolio-tracker. Framework: Other. Root: repository root. Use the included vercel.json and Python 3.12 runtime. The public output directory is deliberately empty: the Python handler serves only explicit frontend routes and authenticated API endpoints.
 2. Connect a Neon PostgreSQL database through Vercel Marketplace, or configure an existing PostgreSQL DATABASE_URL. Use the provider's pooled connection URL and separate databases/branches for Preview and Production. Store credentials only in Vercel environment settings, never Git or chat.
 3. Set ORBIT_SECURE_COOKIE=1 and ORBIT_REGISTRATION_EMAIL=weldonkipchirchir23@gmail.com. Registration is restricted to that email. The hosted entry point fails closed if these or DATABASE_URL are missing.
 4. Automatic Vercel deployment and production domains are accepted from trusted runtime environment variables. For a custom domain add ORBIT_ALLOWED_HOSTS as exact comma-separated hostnames (no scheme/path/wildcard).

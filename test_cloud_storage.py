@@ -5,6 +5,15 @@ import test_integrations as base
 import cloud_storage
 @unittest.skipUnless(os.environ.get('ORBIT_TEST_DATABASE_URL'),'Disposable PostgreSQL not configured')
 class CloudTests(base.APITests):
+ def owned_wallet(self):
+  import test_advanced_api
+  return test_advanced_api.AdvancedAPITests.owned_wallet(self)
+ def test_advanced_api_checkpoint(self):
+  import test_advanced_api
+  test_advanced_api.AdvancedAPITests.test_checkpoint_uses_server_data_and_isolation(self)
+ def test_advanced_api_watchlist(self):
+  import test_advanced_api
+  test_advanced_api.AdvancedAPITests.test_watchlist_only_owns_identity_and_reversible(self)
  def test_concurrent_sales_cannot_oversell(self):
   import test_features
   test_features.FeatureAPITests.test_concurrent_sales_cannot_oversell(self)

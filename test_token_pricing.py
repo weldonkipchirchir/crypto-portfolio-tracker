@@ -16,6 +16,14 @@ def snapshot(quantity='3'):
 
 class TokenPricingTests(unittest.TestCase):
  def setUp(self):pricing.CACHE.clear()
+ def test_selected_pool_metrics_and_optional_bounds(self):
+  row=pair();row.update(volume={'h24':'123.456'},priceChange={'h24':'-12.5'},dexId='uniswap')
+  with patch('providers.request_json',return_value=[row]):quote=pricing.get_quote('Ethereum',CONTRACT)
+  self.assertEqual(quote['market_change_24h_pct'],'-12.5');self.assertEqual(quote['market_volume_24h_usd'],'123.456');self.assertEqual(quote['market_dex'],'uniswap')
+  for invalid in ['NaN','Infinity','-101','1e9999']:
+   pricing.CACHE.clear();row['priceChange']={'h24':invalid};row['volume']={'h24':'-1'}
+   with patch('providers.request_json',return_value=[row]):quote=pricing.get_quote('Ethereum',CONTRACT)
+   self.assertIsNone(quote['market_change_24h_pct']);self.assertIsNone(quote['market_volume_24h_usd'])
  def test_chain_and_base_contract_identity(self):
   for rows in [[pair(chain='bsc')],[pair(contract=OTHER)], [{'chainId':'ethereum','baseToken':{'address':OTHER},'quoteToken':{'address':CONTRACT},'pairAddress':PAIR,'priceUsd':'5','liquidity':{'usd':'1000000'}}]]:
    pricing.CACHE.clear()

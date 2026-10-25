@@ -4,6 +4,7 @@ import imports
 import token_integrations
 import token_discovery
 import token_pricing
+import advanced_portfolio
 import history
 import review
 import review_accounting
@@ -55,6 +56,8 @@ def init():
   if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(71420001)')
   c.executescript('''CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY,email TEXT UNIQUE,password TEXT); CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id INTEGER,expires REAL); CREATE TABLE IF NOT EXISTS trades(id INTEGER PRIMARY KEY,user_id INTEGER,date TEXT,symbol TEXT,side TEXT,quantity TEXT,price TEXT,fee TEXT,account TEXT); CREATE TABLE IF NOT EXISTS prices(user_id INTEGER,symbol TEXT,price TEXT,PRIMARY KEY(user_id,symbol)); CREATE TABLE IF NOT EXISTS wallets(id INTEGER PRIMARY KEY,user_id INTEGER,chain TEXT,address TEXT,label TEXT,UNIQUE(user_id,chain,address));''')
   c.executescript('''CREATE TABLE IF NOT EXISTS price_metadata(user_id INTEGER,symbol TEXT,source TEXT,updated_at INTEGER,PRIMARY KEY(user_id,symbol)); CREATE TABLE IF NOT EXISTS wallet_snapshots(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS wallet_tokens(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS token_watchlist(wallet_id INTEGER PRIMARY KEY,contracts TEXT); CREATE TABLE IF NOT EXISTS imports(user_id INTEGER,digest TEXT,PRIMARY KEY(user_id,digest)); CREATE TABLE IF NOT EXISTS chain_history(wallet_id INTEGER,event_id TEXT,data TEXT,PRIMARY KEY(wallet_id,event_id)); CREATE TABLE IF NOT EXISTS history_sync(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS review_decisions(user_id INTEGER,review_id TEXT,status TEXT,data TEXT,PRIMARY KEY(user_id,review_id)); CREATE TABLE IF NOT EXISTS asset_bindings(user_id INTEGER,asset_id TEXT,symbol TEXT,PRIMARY KEY(user_id,asset_id),UNIQUE(user_id,symbol));''')
+  advanced_portfolio.init(c)
+
 def metadata(c,uid):
  return {r['symbol']:dict(r) for r in c.execute('SELECT m.symbol,m.source,m.updated_at,p.price FROM price_metadata m JOIN prices p ON p.user_id=m.user_id AND p.symbol=m.symbol WHERE m.user_id=?',(uid,))}
 def snapshots(c,uid):
@@ -117,7 +120,7 @@ def persist_tokens(c,wallet,result,contracts):
  old_prices={token['asset_id']:token for token in old.get('tokens',[])}
  for token in result.get('tokens',[]):
   previous=old_prices.get(token['asset_id'],{})
-  for key in ('price_usd','value_usd','price_source','price_fetched_at','price_pair_url','price_liquidity_usd'):
+  for key in ('price_usd','value_usd','price_source','price_fetched_at','price_pair_url','price_liquidity_usd','market_dex','market_change_24h_pct','market_volume_24h_usd'):
    if key in previous:token.setdefault(key,previous[key])
  current={token['asset_id']:token for token in result.get('tokens',[])}
  if result.get('has_more') or result.get('errors'):
@@ -196,9 +199,11 @@ class Handler(BaseHTTPRequestHandler):
   return row[0] if row else None
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
-  static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8')}
+  static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8')}
   if self.path in static:
-   filename,kind=static[self.path];body=(ROOT/filename).read_bytes(); self.send_response(200); self.send_header('Content-Type',kind); self.end_headers(); self.wfile.write(body); return
+   filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
+   if filename=='index.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
+   self.send_response(200); self.send_header('Content-Type',kind); self.end_headers(); self.wfile.write(body); return
   if self.path!='/api/state': self.send(404,{'error':'Not found'}); return
   with connect() as c:
    uid=self.user(c)
@@ -206,7 +211,7 @@ class Handler(BaseHTTPRequestHandler):
    rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=? ORDER BY date,id',(uid,))]
    prices={r['symbol']:r['price'] for r in c.execute('SELECT * FROM prices WHERE user_id=?',(uid,))}
    records,statuses=history_state(c,uid)
-   self.send(200,dict(network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=rows,assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
+   self.send(200,dict(**advanced_portfolio.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=rows,assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
  def do_POST(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   origin=self.headers.get('Origin')
@@ -241,10 +246,16 @@ class Handler(BaseHTTPRequestHandler):
     if not uid: self.send(401,{'error':'Sign in to continue'}); return
     budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens') else nullcontext()
     with budget, providers.deadline(time.monotonic()+30):
-     if self.path in ('/api/trade','/api/import','/api/delete','/api/review'):
+     if self.path in ('/api/trade','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle'):
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')
-     if self.path=='/api/import-preview':
+     if self.path=='/api/checkpoint':
+      result=advanced_portfolio.checkpoint(c,uid,snapshots(c,uid),metadata(c,uid))
+      c.commit();self.send(200,{'ok':True,'checkpoint':result});return
+     elif self.path=='/api/watch-toggle':
+      result=advanced_portfolio.toggle_watch(c,uid,raw,snapshots(c,uid))
+      c.commit();self.send(200,{'ok':True,**result});return
+     elif self.path=='/api/import-preview':
       rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=?',(uid,))]
       self.send(200,imports.preview(raw.get('csv'),rows,trade,calculate)); return
      elif self.path=='/api/review':

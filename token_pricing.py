@@ -32,12 +32,25 @@ def get_quote(chain,contract):
    price=decimal(row.get('priceUsd'),True);liquidity=decimal(row.get('liquidity',{}).get('usd'),True)
    if liquidity<MIN_LIQUIDITY or price>Decimal('1e12'):continue
    pair=providers.validate_address(chain,row.get('pairAddress'))
-   candidates.append((liquidity,pair,price))
+   candidates.append((liquidity,pair,price,row))
   except (ValueError,TypeError,AttributeError):continue
  result=None
  if candidates:
-  liquidity,pair,price=max(candidates,key=lambda item:(item[0],item[1]))
+  liquidity,pair,price,selected=max(candidates,key=lambda item:(item[0],item[1]))
   result={'price_usd':str(price),'price_source':'DEX Screener','price_fetched_at':int(now),'price_pair_url':'https://dexscreener.com/'+dexchain+'/'+pair,'price_liquidity_usd':str(liquidity),'price_stale':False}
+  result['market_dex']=str(selected.get('dexId') or 'Unknown')[:60]
+  result['market_change_24h_pct']=None;result['market_volume_24h_usd']=None
+  try:
+   volume=decimal(selected.get('volume',{}).get('h24'))
+   result['market_volume_24h_usd']=str(volume)
+  except (ValueError,AttributeError):pass
+  try:
+   raw=str(selected.get('priceChange',{}).get('h24'))
+   if len(raw)>350:raise ValueError()
+   change=Decimal(raw)
+   if not change.is_finite() or change<Decimal('-100') or change>Decimal('1e9') or not -255<=change.as_tuple().exponent<=78:raise ValueError()
+   result['market_change_24h_pct']=str(change)
+  except (ValueError,InvalidOperation,AttributeError):pass
  with LOCK:
   if len(CACHE)>=2000:CACHE.pop(min(CACHE,key=lambda item:CACHE[item][0]),None)
   CACHE[key]=(now,result)
@@ -69,6 +82,8 @@ def enrich(chain,snapshot):
       context.prec=500
       token['value_usd']=format(decimal(token['quantity'])*decimal(token['price_usd'],True),'f')
     except (ValueError,KeyError):token['price_usd']=None;token['value_usd']=None
-   else:token['price_usd']=None;token['value_usd']=None;token['price_source']=None;token['price_fetched_at']=None;token['price_stale']=False
+   else:
+    token['price_usd']=None;token['value_usd']=None;token['price_source']=None;token['price_fetched_at']=None;token['price_stale']=False
+    for field in ('price_liquidity_usd','price_pair_url','market_dex','market_volume_24h_usd','market_change_24h_pct'):token[field]=None
   result['tokens'].append(token)
  return result
