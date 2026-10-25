@@ -1,0 +1,22 @@
+# Local portfolio and authentication data
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+# Credentials and local deployment state
+.env
+.env.*
+!.env.example
+.vercel/
+# Local recovery copies
+*.bak
+*.pre-upgrade
+*.advanced-backup
+node_modules/
+
+*.deploy-backup
+.pg-test/

@@ -1,0 +1,9 @@
+*.sqlite3*
+*.db*
+.env*
+.git
+*.bak
+*.pre-upgrade
+*backup
+__pycache__
+test_*

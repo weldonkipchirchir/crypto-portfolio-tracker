@@ -1,0 +1,78 @@
+# Orbit crypto portfolio tracker
+
+Separate workspace: D:\crypto-portfolio-tracker
+
+Run with Python 3.12+: `python server.py`, then open http://127.0.0.1:8042.
+Run accounting checks with `python -m unittest -v`.
+
+Working features: private local user accounts, password hashing, expiring HttpOnly sessions, per-user SQLite storage, manual trades, atomic CSV imports, CSV export, weighted average buy/sell prices, fee-adjusted realized P&L, manual current valuations and unrealized P&L, public address watchlists.
+
+CSV columns: date,symbol,side,quantity,price,fee,account. Date is ISO 8601 (naive timestamps are UTC); prices/fees are USD. Import purchases before sales. Identical file reimports are rejected; overlapping exports can still create duplicates. Transfer history is not imported; do not enter transfers as buys/sells.
+
+Integration status: live native coin balance adapters for Ethereum, Optimism, BNB Chain, Solana, Aptos and Sui (GraphQL). Click Sync balances in Connections. Read-only browser EVM wallet connection is available when an injected wallet provider is present; otherwise add public addresses. Token balances, staking, historical chain imports, exchange API connections and Robinhood syncing remain pending. Never provide seed phrases or private keys.
+
+Market prices: click Prices to fetch supported USD quotes from CoinGecko (BTC, ETH, SOL, BNB, APT, SUI, OP, USDC and USDT). Quotes show provider timestamps and stale status after 15 minutes. Manual prices are supported. Public endpoints can rate-limit; errors are shown and last successful balances are retained. Identical CSV files are rejected; overlapping files still require reconciliation.
+
+Optional environment variables: COINGECKO_DEMO_API_KEY, ETH_RPC_URL, OP_RPC_URL, BNB_RPC_URL, SOL_RPC_URL, APT_RPC_URL (full /v1/view URL), SUI_GRAPHQL_URL. Set these in the process environment before launching. No keys are stored in browser storage. Wallet balances are displayed separately from trade holdings to avoid double counting. Native balances alone do not establish purchase cost basis.
+
+Local development only. Before a public launch: deploy behind HTTPS, add login throttling and recovery, validated chain address adapters and historical indexing, encrypted exchange API credentials, transfer matching and deduplication, automated prices with timestamps, database migrations/backups and operational monitoring. The server binds to loopback. Do not expose this development server directly to the internet.
+
+Accounting uses portfolio-wide weighted average cost (purchase fees included). Average buy/sell displayed prices exclude fees. This is performance tracking, not a jurisdiction-specific tax report. Asset identity currently uses symbols; chain/contract identifiers are needed before importing live tokens with ambiguous symbols.
+
+
+## Deep review update (2026-10-24)
+
+- CSV preview validates every row and accounting before save. Exact normalized duplicate rows in overlapping files are skipped; genuinely identical fills require review.
+- Connections can inspect explicit ERC-20 contracts (max 20) and automatically enumerate Solana SPL/Token-2022 accounts. Quantities retain exact decimal strings and contract/mint identity; unverified tokens are not assigned dollar values or cost bases.
+- Solana inspection shows the latest 25 finalized activity records, not classified trades or complete history.
+- Trade filters include side, asset/account, UTC date range and gross/fee totals. Wallet native totals remain separate from the trade ledger.
+- Request origins/hosts, JSON contracts, auth rate limits, strict script CSP, bounded workers and outbound request quotas are enforced. See SECURITY.md for the threat model and unresolved public launch requirements.
+- All development tests use temporary databases. Run `python -m unittest discover -v`.
+- Exchange credential setup and full historical ingestion remain pending; see INTEGRATIONS.md for official API research and prerequisites.
+
+
+## Automatic Ethereum history
+
+Adding an Ethereum address now fetches external native transactions and ERC-20 transfers into Transactions > On-chain history. Previously saved addresses fetch on first load if no history status exists. Data is persisted and deduplicated by chain event identity. Load older activity follows provider pagination (50 per stream/page). Refresh updates the newest page without deleting older saved records. Internal transfers, NFTs and decoded swaps remain outside this coverage. Transfers are not added to the P&L trade ledger without purchase-cost information. Provider failures preserve previously fetched history.
+
+
+## Swap detection and cost-basis review
+
+Review groups confirmed history by wallet, chain and transaction; it nets each asset by chain/contract identity. One sent asset plus one received asset is a suggested swap, not a verified trade. Incoming assets can be reviewed to record a verified original acquisition; transfers and failed/pending transactions are never automatically purchases. Complex movements require manual review.
+
+Confirmation requires actual date, total USD value, fees and identity acknowledgment. Swap sale and purchase are committed together after holdings validation; missing source purchases block confirmation. Review IDs remain stable across additional history pages and cannot be confirmed twice. Dismissal adds no trades. Arbitrary token contracts use separate ledger aliases; native/market symbols are reserved to avoid pricing counterfeit tokens as genuine assets. Exact quantities are read from saved history rather than client input. Fees are entered in USD; native gas units are shown as context and are not converted using today's price. Full internal/DeFi/bridge decoding remains outside current coverage.
+
+
+## Other-network history (25 October 2026)
+
+History dispatch now covers Ethereum, Optimism, BNB Chain, Solana, Aptos and Sui. See NETWORKS.md for exact support, provider configuration and limitations. BNB history requires a server-side Etherscan V2 API key; balances do not. Optimism native trades use ETH_OP so chain identities do not collide. Sui unknown-decimal tokens retain raw units and block review for their entire transaction. Older saved histories are refreshed once after this upgrade.
+
+
+## Base, Arbitrum, Polygon and Avalanche
+
+Added four mainnet options with native balances, explicit ERC-20 inspection, wallet chain selection, USD quotes and distinct review ledger identities (ETH_BASE, ETH_ARB, POL, AVAX). Avalanche C-Chain has public native history; Base/Arbitrum/Polygon indexed history needs configured Etherscan access, with a paid plan for Base. See NETWORKS.md for exact limits.
+
+
+## Sonic, Gnosis and Celo
+
+The tracker now lists 13 networks. Sonic (S), Gnosis (XDAI) and Celo (CELO) support balances, market quotes, ERC-20 inspection, browser-wallet network selection and separate ledger aliases. Gnosis/Celo have public external transaction and token-transfer history. Sonic native history needs Etherscan API access. Celo alternate gas currencies are not normalized automatically. Details and provider limits are in NETWORKS.md.
+
+
+## Bitcoin, Stellar, TRON and new EVM mainnets
+
+Added Bitcoin, Stellar, Tron, Circle Arc mainnet, Monad mainnet, Robinhood Chain mainnet and Linea:20network choices. BTC/Stellar/TRX have dedicated checksum-aware native balance/history adapters; four EVM chains have native balances/ERC-20 inspection and configured explorer-history adapters. Arc native USDC/interface quantities are kept separate from arithmetic to avoid duplicate holdings. Robinhood Chain is independent of exchange/broker account imports. See NETWORKS.md for exact coverage, keys and unsupported operations.
+
+
+## Automatic token holdings and PONS
+
+Wallets now keep persisted token snapshots and watched ERC-20 contracts. Global Sync refreshes native balances, market prices and token holdings sequentially; new wallets trigger token checks automatically. Manual inspection persists contract choices. Names/symbols are read via bounded ERC-20 ABI decoding and treated as unverified metadata. Amounts retain exact decimal strings. Partial/provider failures retain clearly marked stale last-known values; zero balances replace previously positive values.
+
+For EVM discovery, configure a compatible Alchemy token-indexer endpoint via the per-chain environment variable in token_discovery.ENV_NAMES (for example ALCHEMY_RH_RPC_URL for Robinhood Chain). Supported indexer coverage varies. Without that, ETHERSCAN_API_KEY can discover contracts from up to100 recent token transfers (not a complete holdings inventory). Without credentials, Robinhood Chain checks a limited PONS catalog; other EVM networks show that broader indexing is unavailable. At most20 contracts are queried per refresh. The app does not promise exhaustive token discovery, prices or purchase history.
+
+The Robinhood Chain PONS contract is0x39dbed3a2bd333467115de45665cc57f813c4571. It is distinct from the public holder wallet address. Native ETH can be zero while PONS holdings are positive. Token metadata/balances were read directly from the chain; PONS USD valuations are not inferred from its ticker. Never enter this token contract as a replacement for the wallet holding it.
+
+### Token USD values
+Token holdings display indicative USD unit prices and values from DEX Screener, matched by network and contract address. Quotes use the highest-liquidity eligible pool with at least $10,000 reported liquidity, cache for 60 seconds, and show their observation time. Unsupported or unquoted tokens remain Unpriced; retained older quotes are marked stale. Refresh Prices updates saved token valuations. Market value does not establish purchase cost or profit/loss. Partial token discovery means wallet totals can be incomplete.
+
+## GitHub / Vercel
+Full hosted deployment uses the included Python function and PostgreSQL adapter; see DEPLOYMENT.md for required environment variables, owner registration restriction and preview validation. Local SQLite remains the default when DATABASE_URL is absent. Local financial records are never bundled for deployment.
