@@ -72,11 +72,11 @@ def allowance(key,limit,seconds):
   c.execute('DELETE FROM orbit_limits WHERE expires<EXTRACT(EPOCH FROM clock_timestamp())-86400')
   return row['hits']<=limit
 @contextmanager
-def provider_action(uid):
+def provider_action(uid,*,kind='provider',limit=12):
  import secrets
  from runtime_security import BudgetExceeded
- key='provider:'+str(uid);token=secrets.token_hex(16)
- if not allowance(key,12,60):raise BudgetExceeded('Provider request budget reached. Retry shortly.')
+ key=kind+':'+str(uid);token=secrets.token_hex(16)
+ if not allowance(key,limit,60):raise BudgetExceeded('Provider request budget reached. Retry shortly.')
  with connect() as c:
   row=c.execute('INSERT INTO orbit_leases VALUES (?,?,EXTRACT(EPOCH FROM clock_timestamp())+60) ON CONFLICT (key) DO UPDATE SET token=EXCLUDED.token,expires=EXCLUDED.expires WHERE orbit_leases.expires<=EXTRACT(EPOCH FROM clock_timestamp()) RETURNING key',(key,token)).fetchone()
   if not row:raise BudgetExceeded('A provider operation is already running for this account')

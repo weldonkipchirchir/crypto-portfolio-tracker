@@ -82,3 +82,6 @@ Insights adds account-saved wallet-value checkpoints, a contract-based holdings 
 
 ## USD price targets
 Targets adds recurring inclusive price conditions and an account event history, evaluated on explicit price refresh or target creation. It uses fresh provider quotes and exact contract identities; it does not monitor in the background or send email/push. See PRICE_TARGETS.md for research, limits and validation.
+
+## Top-ranked coin markets
+Markets loads up to 250 CoinGecko market-cap-ranked coins with search, sorting and pagination. Coin pages include real historical USD charts, supply, cap/FDV, volume and exact-ID-matched DefiLlama protocol revenue. Unlock summaries require an existing DEFILLAMA_API_KEY API subscription; missing schedules are never inferred from supply. See MARKETS.md for provider setup, provenance, caching and limits.

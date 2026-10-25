@@ -1,0 +1,16 @@
+import unittest,urllib.request,urllib.error,json
+from unittest.mock import patch
+import server,test_integrations,coin_market
+class MarketsAPITests(test_integrations.APITests):
+ def test_authentication_and_routes(self):
+  with self.assertRaises(urllib.error.HTTPError):self.call(self.client(),'market-listings',{})
+  with patch('coin_market.listings',return_value={'coins':[{'id':'bitcoin'}],'fetched_at':1}):self.assertEqual(self.call(self.a,'market-listings',{})['coins'][0]['id'],'bitcoin')
+  with patch('coin_market.detail',return_value={'coin':{'id':'bitcoin'}}):self.assertEqual(self.call(self.a,'market-detail',{'coin_id':'bitcoin'})['coin']['id'],'bitcoin')
+  with patch('coin_market.chart',return_value={'points':[]}):self.assertEqual(self.call(self.a,'market-chart',{'coin_id':'bitcoin','days':7})['points'],[])
+  with patch('protocol_data.fundamentals',return_value={'coin_id':'bitcoin'}):self.assertEqual(self.call(self.a,'market-fundamentals',{'coin_id':'bitcoin'})['coin_id'],'bitcoin')
+ def test_shared_cache_and_source_files(self):
+  server.market_cache_write(('list',),{'coins':[],'fetched_at':123});self.assertEqual(server.market_cache_read(('list',))['fetched_at'],123)
+  for path in ['/market_dashboard.js','/market_dashboard.css']:
+   with urllib.request.urlopen('http://127.0.0.1:'+str(self.app.server_port)+path) as r:self.assertEqual(r.status,200);self.assertIn("script-src 'self'",r.headers['Content-Security-Policy'])
+  with self.assertRaises(urllib.error.HTTPError):urllib.request.urlopen('http://127.0.0.1:'+str(self.app.server_port)+'/coin_market.py')
+if __name__=='__main__':unittest.main()

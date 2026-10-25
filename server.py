@@ -6,11 +6,14 @@ import token_discovery
 import token_pricing
 import advanced_portfolio
 import price_targets
+import coin_market
+import protocol_data
 import history
 import review
 import review_accounting
 from runtime_security import BoundedHTTPServer, ProviderBudget, BudgetExceeded
 PROVIDER_BUDGET=ProviderBudget()
+MARKET_BUDGET=ProviderBudget(limit=60)
 from concurrent.futures import ThreadPoolExecutor
 import csv, hashlib, hmac, io, json, os, secrets, sqlite3, time, re, threading
 from urllib.parse import urlsplit
@@ -59,6 +62,17 @@ def init():
   c.executescript('''CREATE TABLE IF NOT EXISTS price_metadata(user_id INTEGER,symbol TEXT,source TEXT,updated_at INTEGER,PRIMARY KEY(user_id,symbol)); CREATE TABLE IF NOT EXISTS wallet_snapshots(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS wallet_tokens(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS token_watchlist(wallet_id INTEGER PRIMARY KEY,contracts TEXT); CREATE TABLE IF NOT EXISTS imports(user_id INTEGER,digest TEXT,PRIMARY KEY(user_id,digest)); CREATE TABLE IF NOT EXISTS chain_history(wallet_id INTEGER,event_id TEXT,data TEXT,PRIMARY KEY(wallet_id,event_id)); CREATE TABLE IF NOT EXISTS history_sync(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS review_decisions(user_id INTEGER,review_id TEXT,status TEXT,data TEXT,PRIMARY KEY(user_id,review_id)); CREATE TABLE IF NOT EXISTS asset_bindings(user_id INTEGER,asset_id TEXT,symbol TEXT,PRIMARY KEY(user_id,asset_id),UNIQUE(user_id,symbol));''')
   advanced_portfolio.init(c)
   price_targets.init(c)
+  c.execute('CREATE TABLE IF NOT EXISTS coin_market_cache (key TEXT PRIMARY KEY,fetched_at INTEGER NOT NULL,data TEXT NOT NULL)')
+
+def market_cache_read(key):
+ with connect() as c:
+  row=c.execute('SELECT data FROM coin_market_cache WHERE key=?',(json.dumps(key),)).fetchone()
+  return json.loads(row['data']) if row else None
+
+def market_cache_write(key,data):
+ with connect() as c:
+  c.execute('INSERT INTO coin_market_cache(key,fetched_at,data) VALUES (?,?,?) ON CONFLICT (key) DO UPDATE SET fetched_at=EXCLUDED.fetched_at,data=EXCLUDED.data',(json.dumps(key),data['fetched_at'],json.dumps(data)))
+  c.execute('DELETE FROM coin_market_cache WHERE key IN (SELECT key FROM coin_market_cache ORDER BY fetched_at DESC LIMIT 10000 OFFSET 400)')
 
 def metadata(c,uid):
  return {r['symbol']:dict(r) for r in c.execute('SELECT m.symbol,m.source,m.updated_at,p.price FROM price_metadata m JOIN prices p ON p.user_id=m.user_id AND p.symbol=m.symbol WHERE m.user_id=?',(uid,))}
@@ -201,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
   return row[0] if row else None
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
-  static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8')}
+  static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8'),'/market_dashboard.js':('market_dashboard.js','text/javascript; charset=utf-8'),'/market_dashboard.css':('market_dashboard.css','text/css; charset=utf-8')}
   if self.path in static:
    filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
    if filename=='index.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
@@ -246,8 +260,18 @@ class Handler(BaseHTTPRequestHandler):
      self.send_response(200); self.send_header('Set-Cookie','session='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400'+('; Secure' if os.environ.get('ORBIT_SECURE_COOKIE')=='1' else '')); self.send_header('Content-Type','application/json'); self.end_headers(); self.wfile.write(b'{"ok":true}'); return
     uid=self.user(c)
     if not uid: self.send(401,{'error':'Sign in to continue'}); return
-    budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens') else nullcontext()
+    market_action=self.path in ('/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals')
+    if market_action:budget=__import__('cloud_storage').provider_action(uid,kind='market',limit=60) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)
+    else:budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens') else nullcontext()
     with budget, providers.deadline(time.monotonic()+30):
+     if market_action:
+      c.commit()
+      with coin_market.persistence(market_cache_read,market_cache_write):
+       if self.path=='/api/market-listings':result=coin_market.listings()
+       elif self.path=='/api/market-detail':result=coin_market.detail(raw.get('coin_id'))
+       elif self.path=='/api/market-chart':result=coin_market.chart(raw.get('coin_id'),raw.get('days',30))
+       else:result=protocol_data.fundamentals(raw.get('coin_id'))
+      self.send(200,result);return
      if self.path in ('/api/trade','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove'):
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')

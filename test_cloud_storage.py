@@ -27,6 +27,12 @@ class CloudTests(base.APITests):
   self.owned_wallet=lambda:test_targets_api.TargetsAPITests.owned_wallet(self)
   try:test_targets_api.TargetsAPITests.test_price_refresh_evaluates_without_duplicates(self)
   finally:self.owned_wallet=original
+ def test_markets_auth_routes(self):
+  import test_markets_api
+  test_markets_api.MarketsAPITests.test_authentication_and_routes(self)
+ def test_markets_shared_cache(self):
+  import test_markets_api
+  test_markets_api.MarketsAPITests.test_shared_cache_and_source_files(self)
  def test_concurrent_sales_cannot_oversell(self):
   import test_features
   test_features.FeatureAPITests.test_concurrent_sales_cannot_oversell(self)
