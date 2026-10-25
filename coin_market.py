@@ -145,23 +145,35 @@ def detail(coin_id):
   return {'coin':row,'availability':dict(AVAILABILITY)}
  return cached(('detail',identity),600,load)
 
-def chart(coin_id,days):
+def chart(coin_id,days,kind='line'):
+ if isinstance(days,bool) or str(days) not in ('1','7','30','90','365','max'):raise ValueError('Chart range must be 1, 7, 30, 90, 365 or max')
+ if kind not in ('line','candles'):raise ValueError('Chart type must be line or candles')
  identity=allowed(coin_id)
- if isinstance(days,bool) or str(days) not in ('1','7','30','90'):raise ValueError('Chart range must be 1, 7, 30 or 90 days')
- days=int(days)
+ requested='max' if days=='max' else int(days);effective=365 if requested=='max' else requested
  def load():
-  payload=request('/coins/'+identity+'/market_chart?'+urlencode({'vs_currency':'usd','days':days}))
-  rows=payload.get('prices') if isinstance(payload,dict) else None
+  endpoint='ohlc' if kind=='candles' else 'market_chart'
+  payload=request('/coins/'+identity+'/'+endpoint+'?'+urlencode({'vs_currency':'usd','days':effective}))
+  rows=payload if kind=='candles' else payload.get('prices') if isinstance(payload,dict) else None
   if not isinstance(rows,list) or not 1<=len(rows)<=3000:raise ValueError('Invalid chart response')
-  now=int(time.time()*1000);minimum=now-(days*86400+21600)*1000;points={}
+  now=int(time.time()*1000);minimum=now-(effective*86400+21600)*1000;points={}
   for row in rows:
-   if not isinstance(row,list) or len(row)!=2:continue
-   ts=numeric(row[0]);price=numeric(row[1])
-   if ts is None or price is None:continue
+   if not isinstance(row,list) or len(row)!=(5 if kind=='candles' else 2):continue
+   ts=numeric(row[0]);values=[numeric(v) for v in row[1:]]
+   if ts is None or any(v is None for v in values):continue
    ts=Decimal(ts)
    if ts!=ts.to_integral_value() or not minimum<=ts<=now+60000:continue
    ts=int(ts)
-   if ts not in points:points[ts]=price
+   if kind=='candles':
+    opening,high,low,closing=map(Decimal,values)
+    if low>high or not low<=opening<=high or not low<=closing<=high:continue
+    point=dict(timestamp=ts,**dict(zip(('open','high','low','close'),values)))
+   else:point={'timestamp':ts,'price':values[0]}
+   if ts not in points:points[ts]=point
   if len(points)<2:raise ValueError('Not enough valid historical points')
-  return {'coin_id':identity,'days':days,'points':[{'timestamp':ts,'price':points[ts]} for ts in sorted(points)],'coverage':'Provider historical USD prices; no interpolated or generated points.'}
- return cached(('chart',identity,days),300,load)
+  ordered=[points[ts] for ts in sorted(points)]
+  granularity=('30-minute' if effective<=2 else '4-hour' if effective<=30 else '4-day') if kind=='candles' else ('5-minute' if effective==1 else 'hourly' if effective<=90 else 'daily')
+  coverage=('ALL is all history accessible through the current provider, limited to the past 365 days; it is not necessarily history since launch. ' if requested=='max' else '')
+  coverage+='CoinGecko Demo historical USD '+('OHLC candles' if kind=='candles' else 'prices')+'; automatic '+granularity+' intervals. No interpolated or generated '+('candles' if kind=='candles' else 'points')+'.'
+  if kind=='candles':coverage+=' Candle timestamps are close times.'
+  return {'coin_id':identity,'days':requested,'effective_days':effective,'kind':kind,'chart_type':kind,'history_limit_days':365,'observed_from':ordered[0]['timestamp'],'observed_to':ordered[-1]['timestamp'],'candles' if kind=='candles' else 'points':ordered,'coverage':coverage}
+ return cached(('chart',identity,requested,kind),300,load)

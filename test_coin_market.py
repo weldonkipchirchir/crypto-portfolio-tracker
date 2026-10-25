@@ -41,6 +41,33 @@ class MarketTests(unittest.TestCase):
   self.assertEqual([p['price'] for p in data['points']],['10','11']);self.assertEqual(len(data['points']),2)
  def test_chart_range_validation(self):
   with patch('providers.request_json',return_value=[row()]):
-   for days in [True,365,'../']:
+   for days in [True,366,'../',None]:
     with self.assertRaises(ValueError):m.chart('bitcoin',days)
+ def test_all_is_explicit_provider_limit(self):
+  now=int(time.time()*1000)
+  with patch('providers.request_json',side_effect=[[row()],{'prices':[[now-86400000,1],[now,2]]}]) as req:
+   data=m.chart('bitcoin','max')
+  self.assertIn('days=365',req.call_args.args[0]);self.assertEqual(data['days'],'max');self.assertEqual(data['history_limit_days'],365);self.assertIn('not necessarily history since launch',data['coverage']);self.assertEqual(data['chart_type'],'line')
+ def test_candles_validate_real_ohlc_and_deduplicate(self):
+  now=int(time.time()*1000)
+  candles=[[now-3000,10,12,9,11],[now-2000,11,13,10,12],[now-2000,1,1,1,1],[now-1000,12,11,10,10],[now-900,1,2,3,2],[now-800,1,float('inf'),0,1],[now-700,True,2,0,1],[now+1000000,1,2,0,1],[1,1,2,0,1]]
+  with patch('providers.request_json',side_effect=[[row()],candles]) as req:data=m.chart('bitcoin',7,'candles')
+  self.assertIn('/ohlc?',req.call_args.args[0]);self.assertEqual(len(data['candles']),2);self.assertEqual(data['candles'][1]['close'],'12');self.assertNotIn('points',data);self.assertIn('4-hour',data['coverage']);self.assertIn('close times',data['coverage'])
+ def test_chart_type_isolation_and_validation(self):
+  now=int(time.time()*1000)
+  with patch('providers.request_json',side_effect=[[row()],{'prices':[[now-2000,1],[now,2]]},[[now-2000,1,2,0,1],[now,2,3,1,2]]]):
+   line=m.chart('bitcoin',1);candles=m.chart('bitcoin',1,'candles')
+  self.assertIn('points',line);self.assertIn('candles',candles)
+  for kind in ['ohlc','../',True,None]:
+   with self.assertRaises(ValueError):m.chart('bitcoin',1,kind)
+ def test_chart_rejects_oversized_or_insufficient_candles(self):
+  now=int(time.time()*1000)
+  for payload in [[[now,1,2,0,1]]*3001,[[now,1,2,0,1]],[[now,1,0,2,1],[now-1000,1,0,2,1]]]:
+   m.CACHE.clear();m.FAILURES.clear()
+   with patch('providers.request_json',side_effect=[[row()],payload]):
+    with self.assertRaises(ValueError):m.chart('bitcoin',365,'candles')
+ def test_candles_all_uses_provider_supported_day_count(self):
+  now=int(time.time()*1000)
+  with patch('providers.request_json',side_effect=[[row()],[[now-86400000,1,2,0,1],[now,2,3,1,2]]]) as req:data=m.chart('bitcoin','max','candles')
+  self.assertIn('days=365',req.call_args.args[0]);self.assertIn('4-day',data['coverage']);self.assertEqual(data['observed_to'],now)
 if __name__=='__main__':unittest.main()

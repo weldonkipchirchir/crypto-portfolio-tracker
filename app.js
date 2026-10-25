@@ -7,7 +7,7 @@ function toast(s){clearTimeout(toastTimer);$('toast').textContent=s;$('toast').c
 
 let providerRequestTail=Promise.resolve();
 
-async function api(path,data){if(['sync','refresh-prices','history','wallet-details','discover-tokens','market-listings','market-detail','market-chart','market-fundamentals'].includes(path)){const pending=providerRequestTail.then(()=>rawApi(path,data));providerRequestTail=pending.catch(()=>{});return pending}return rawApi(path,data)}
+async function api(path,data){if(['sync','refresh-prices','history','wallet-details','discover-tokens','market-listings','market-detail','market-chart','market-fundamentals','market-news'].includes(path)){const pending=providerRequestTail.then(()=>rawApi(path,data));providerRequestTail=pending.catch(()=>{});return pending}return rawApi(path,data)}
 
 async function rawApi(path,data){const r=await fetch('/api/'+path,{method:data?'POST':'GET',headers:{'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});const j=await r.json();if(!r.ok){const e=Error(j.error||'Request failed');e.status=r.status;throw e;}return j}
 
@@ -164,7 +164,7 @@ function renderInsights(){if($('portfolioInsights')&&window.OrbitInsights)$('por
 
 function renderAdvanced(){const host=$('advancedWorkspace');if(!host||!window.OrbitAdvanced)return;host.innerHTML=OrbitAdvanced.render(state);OrbitAdvanced.bind(host,{toggleWatch:async asset_id=>{await api('watch-toggle',{asset_id});await load();toast('Watchlist updated')},checkpoint:async()=>{await api('checkpoint',{});await load();toast('Wallet value checkpoint saved. This is not investment return.')},error:error=>toast(error?.message||String(error))});}
 function renderTargets(){const host=$('targetWorkspace');if(!host||!window.OrbitTargets)return;host.innerHTML=OrbitTargets.render(state);OrbitTargets.bind(host,{save:async raw=>{const result=await api('target-save',raw);window.OrbitTargets?.resetDraft?.();await load();toast(result.evaluation?.triggered?'Target saved. A fresh saved quote matched the condition.':'Target saved. Conditions are checked on price refresh.')},remove:async id=>{await api('target-remove',{id});await load();toast('Target removed. Recorded events are retained.')},error:error=>toast(error?.message||String(error))});}
-function mountMarkets(){if(!window.OrbitMarkets)return;OrbitMarkets.mount($('marketWorkspace'),{listings:()=>api('market-listings',{}),detail:coin_id=>api('market-detail',{coin_id}),chart:(coin_id,days)=>api('market-chart',{coin_id,days}),fundamentals:coin_id=>api('market-fundamentals',{coin_id}),error:toast});}
+function mountMarkets(){if(!window.OrbitMarkets)return;OrbitMarkets.mount($('marketWorkspace'),{listings:()=>api('market-listings',{}),detail:coin_id=>api('market-detail',{coin_id}),chart:(coin_id,days,kind='line')=>api('market-chart',{coin_id,days,kind}),fundamentals:coin_id=>api('market-fundamentals',{coin_id}),news:coin_id=>api('market-news',{coin_id}),error:toast});}
 function knownQuote(value){return value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))&&Number(value)>=0}
 
 function tokenQuoteStale(t){return !!(t.stale||t.price_stale||!t.price_fetched_at||Date.now()/1000-Number(t.price_fetched_at)>900)}

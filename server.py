@@ -8,6 +8,7 @@ import advanced_portfolio
 import price_targets
 import coin_market
 import protocol_data
+import market_news
 import history
 import review
 import review_accounting
@@ -260,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
      self.send_response(200); self.send_header('Set-Cookie','session='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400'+('; Secure' if os.environ.get('ORBIT_SECURE_COOKIE')=='1' else '')); self.send_header('Content-Type','application/json'); self.end_headers(); self.wfile.write(b'{"ok":true}'); return
     uid=self.user(c)
     if not uid: self.send(401,{'error':'Sign in to continue'}); return
-    market_action=self.path in ('/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals')
+    market_action=self.path in ('/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news')
     if market_action:budget=__import__('cloud_storage').provider_action(uid,kind='market',limit=60) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)
     else:budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens') else nullcontext()
     with budget, providers.deadline(time.monotonic()+30):
@@ -269,7 +270,8 @@ class Handler(BaseHTTPRequestHandler):
       with coin_market.persistence(market_cache_read,market_cache_write):
        if self.path=='/api/market-listings':result=coin_market.listings()
        elif self.path=='/api/market-detail':result=coin_market.detail(raw.get('coin_id'))
-       elif self.path=='/api/market-chart':result=coin_market.chart(raw.get('coin_id'),raw.get('days',30))
+       elif self.path=='/api/market-chart':result=coin_market.chart(raw.get('coin_id'),raw.get('days',30),raw.get('kind','line'))
+       elif self.path=='/api/market-news':result=market_news.news(raw.get('coin_id'))
        else:result=protocol_data.fundamentals(raw.get('coin_id'))
       self.send(200,result);return
      if self.path in ('/api/trade','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove'):

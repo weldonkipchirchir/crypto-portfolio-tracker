@@ -27,3 +27,17 @@ Strict coin-ID whitelist validation limits detail/chart calls to the ranked dire
 
 ## Tests
 `python -m unittest discover -q`, with ORBIT_TEST_DATABASE_URL for disposable real PostgreSQL checks. Existing UI checks plus `node market_dashboard.test.cjs` cover actual charts, unknown supply, safe links, escaping, pagination and late-response races. Browser tests cover Bitcoin/Aave details, ranked listings, search, range switches, supply and exact-ID-matched revenue. Provider availability and paid unlock access remain external dependencies.
+
+
+## Chart and news upgrade
+Charts now offer 1D, 7D, 30D, 90D, 1Y and ALL, with line/candlestick views. ALL means all currently accessible provider history, limited to the past 365 days on CoinGecko Demo; it does not promise history since launch. OHLC comes directly from `/coins/{id}/ohlc`, not line-point aggregation. Candle close timestamps and provider auto intervals (30 minutes for 1D, four hours for 7/30D, four days for 90D/1Y/ALL) are disclosed. The observed start/end, retrieved time, stale warnings and recent OHLC table remain visible. Invalid OHLC ordering, future/nonfinite values and duplicate timestamps are filtered. Line/type/range/coin async responses cannot overwrite a newer selection.
+
+Coin news loads only on request. Without configured licensed access, the panel offers an external Google News web search by coin name and cryptocurrency context; no Google RSS or publisher feed is copied. Optional NEWS_API_KEY enables NewsAPI `/v2/everything` using the server-only X-Api-Key header, English title search with a quoted coin name and crypto context, the past30days and bounded pagination. Vercel additionally requires NEWS_API_PRODUCTION_LICENSED=1. Configure that flag only for an existing plan permitting production use; free Developer keys are restricted to local development and testing. No account or subscription is created by the app. Only sanitized headline, publisher, publication date and HTTPS link are stored (15-minute cache); full article text/images are omitted. Name matches can include namesakes; no contract-level news identity is claimed. Licensed headlines have fixture coverage only until a valid provider key is configured.
+
+Additional official research:
+- https://docs.coingecko.com/demo/reference/coins-id-ohlc
+- https://newsapi.org/docs/endpoints/everything
+- https://newsapi.org/docs/authentication
+- https://newsapi.org/pricing
+
+Regression coverage: `python -m unittest test_coin_market test_market_news test_markets_api -q`, `node market_dashboard.test.cjs`; real CoinGecko Bitcoin1D OHLC returned48candles and ALLline returned366dailyobservations during implementation.
