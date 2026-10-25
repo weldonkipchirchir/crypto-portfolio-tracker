@@ -8,6 +8,9 @@ class MarketsAPITests(test_integrations.APITests):
   with patch('coin_market.detail',return_value={'coin':{'id':'bitcoin'}}):self.assertEqual(self.call(self.a,'market-detail',{'coin_id':'bitcoin'})['coin']['id'],'bitcoin')
   with patch('coin_market.chart',return_value={'candles':[]}) as chart:
    self.assertEqual(self.call(self.a,'market-chart',{'coin_id':'bitcoin','days':'max','kind':'candles'})['candles'],[]);chart.assert_called_once_with('bitcoin','max','candles')
+  with patch('exchange_charts.chart',return_value={'source':'Binance','quote_currency':'USDT'}) as chart:
+   self.assertEqual(self.call(self.a,'market-chart',{'coin_id':'bitcoin','days':'max','kind':'candles','source':'binance'})['quote_currency'],'USDT');chart.assert_called_once_with('bitcoin','max','candles','binance')
+  with self.assertRaises(urllib.error.HTTPError):self.call(self.a,'market-chart',{'coin_id':'bitcoin','source':'bad'})
   with patch('market_news.news',return_value={'articles':[]}):self.assertEqual(self.call(self.a,'market-news',{'coin_id':'bitcoin'})['articles'],[])
   with patch('protocol_data.fundamentals',return_value={'coin_id':'bitcoin'}):self.assertEqual(self.call(self.a,'market-fundamentals',{'coin_id':'bitcoin'})['coin_id'],'bitcoin')
  def test_shared_cache_and_source_files(self):

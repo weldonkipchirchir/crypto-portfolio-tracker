@@ -9,6 +9,7 @@ import price_targets
 import coin_market
 import protocol_data
 import market_news
+import exchange_charts
 import history
 import review
 import review_accounting
@@ -270,7 +271,11 @@ class Handler(BaseHTTPRequestHandler):
       with coin_market.persistence(market_cache_read,market_cache_write):
        if self.path=='/api/market-listings':result=coin_market.listings()
        elif self.path=='/api/market-detail':result=coin_market.detail(raw.get('coin_id'))
-       elif self.path=='/api/market-chart':result=coin_market.chart(raw.get('coin_id'),raw.get('days',30),raw.get('kind','line'))
+       elif self.path=='/api/market-chart':
+        source=raw.get('source','coingecko')
+        if source=='coingecko':result=coin_market.chart(raw.get('coin_id'),raw.get('days',30),raw.get('kind','line'))
+        elif source in ('binance','coinbase'):result=exchange_charts.chart(raw.get('coin_id'),raw.get('days',30),raw.get('kind','line'),source)
+        else:raise ValueError('Choose CoinGecko, Binance or Coinbase chart data')
        elif self.path=='/api/market-news':result=market_news.news(raw.get('coin_id'))
        else:result=protocol_data.fundamentals(raw.get('coin_id'))
       self.send(200,result);return
