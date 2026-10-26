@@ -87,6 +87,27 @@ class AccountFeaturesTests(unittest.TestCase):
    self.assertNotIn('private',str(caught.exception))
  def test_fixed_operations(self):
   with self.assertRaises(ValueError):e.signed('/api/v3/order','a','b')
+ def test_exchange_version_rotation_and_legacy(self):
+  from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+  import secrets
+  first=base64.urlsafe_b64encode(bytes(range(32))).decode();second=base64.urlsafe_b64encode(bytes(range(32,64))).decode()
+  payload={'api_key':'fake-test-key','api_secret':'fake-test-secret'}
+  with patch.dict(os.environ,{'ORBIT_EXCHANGE_KEY':first,'ORBIT_EXCHANGE_KEY_ID':'old','ORBIT_EXCHANGE_PREVIOUS_KEYS':'{}'}):
+   old=e.crypt(1,'connection',payload);self.assertTrue(old.startswith('v1:old:'))
+   self.assertNotEqual(old,e.crypt(1,'connection',payload))
+   nonce=secrets.token_bytes(12);legacy=base64.urlsafe_b64encode(nonce+AESGCM(bytes(range(32))).encrypt(nonce,json.dumps(payload).encode(),b'orbit:binance:1:connection')).decode()
+   self.assertEqual(e.crypt(1,'connection',legacy,True),payload)
+   self.c.execute('INSERT INTO exchange_connections VALUES (?,?,?,?,?)',(1,'connection','test',old,'{}'))
+   with self.assertRaises(ValueError):e.crypt(1,'connection',old.replace('v1:old:','v2:old:'),True)
+  with patch.dict(os.environ,{'ORBIT_EXCHANGE_KEY':second,'ORBIT_EXCHANGE_KEY_ID':'new','ORBIT_EXCHANGE_PREVIOUS_KEYS':json.dumps({'old':first})}):
+   self.assertEqual(e.crypt(1,'connection',old,True),payload)
+   self.assertEqual(e.rewrap_credentials(self.c,1),1)
+   new=self.c.execute('SELECT credentials FROM exchange_connections').fetchone()[0]
+   self.assertTrue(new.startswith('v1:new:'));self.assertEqual(e.crypt(1,'connection',new,True),payload)
+   with self.assertRaises(ValueError):e.crypt(1,'connection',old.replace('v1:old:','v1:new:'),True)
+  with patch.dict(os.environ,{'ORBIT_EXCHANGE_KEY':second,'ORBIT_EXCHANGE_KEY_ID':'new','ORBIT_EXCHANGE_PREVIOUS_KEYS':'{}'}):
+   self.assertEqual(e.crypt(1,'connection',new,True),payload)
+   with self.assertRaises(ValueError):e.crypt(1,'connection',old,True)
  def test_encrypted_credentials_account_binding(self):
   try:import cryptography
   except ImportError:self.skipTest('cryptography not installed')

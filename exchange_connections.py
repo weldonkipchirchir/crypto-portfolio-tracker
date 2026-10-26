@@ -18,16 +18,55 @@ def master_key():
   return key
  except (ValueError,TypeError):raise ValueError('Exchange connections are not configured. Set ORBIT_EXCHANGE_KEY on the server.') from None
 
+def encryption_keys():
+ current=os.environ.get('ORBIT_EXCHANGE_KEY_ID','primary')
+ if not re.fullmatch(r'[A-Za-z0-9_-]{1,40}',current):raise ValueError('Exchange encryption key ID is invalid')
+ try:
+  previous=json.loads(os.environ.get('ORBIT_EXCHANGE_PREVIOUS_KEYS','{}'))
+  if not isinstance(previous,dict) or len(previous)>8:raise ValueError()
+  keys={}
+  for kid,value in previous.items():
+   if not re.fullmatch(r'[A-Za-z0-9_-]{1,40}',kid):raise ValueError()
+   decoded=base64.b64decode(value,altchars=b'-_',validate=True)
+   if len(decoded)!=32 or kid==current:raise ValueError()
+   keys[kid]=decoded
+  keys[current]=master_key()
+  return current,keys
+ except (ValueError,TypeError):raise ValueError('Exchange encryption key configuration is invalid') from None
+
 def crypt(uid,identity,value,decrypt=False):
  try:
   from cryptography.hazmat.primitives.ciphers.aead import AESGCM
  except ImportError:raise ValueError('Exchange encryption dependency is unavailable') from None
- key=master_key();aad=('orbit:binance:'+str(uid)+':'+identity).encode()
+ current,keys=encryption_keys();binding='orbit:binance:'+str(uid)+':'+identity
  try:
   if decrypt:
-   blob=base64.urlsafe_b64decode(value);return json.loads(AESGCM(key).decrypt(blob[:12],blob[12:],aad))
-  nonce=secrets.token_bytes(12);return base64.urlsafe_b64encode(nonce+AESGCM(key).encrypt(nonce,json.dumps(value).encode(),aad)).decode()
+   if not isinstance(value,str) or len(value)>8192:raise ValueError()
+   if ':' in value:
+    version,kid,encoded=value.split(':',2)
+    if version!='v1' or kid not in keys:raise ValueError()
+    aad=(binding+':v1:'+kid).encode();key=keys[kid]
+   else:
+    # Legacy records used the unversioned active key and binding.
+    encoded=value;aad=binding.encode();key=keys[current]
+   blob=base64.b64decode(encoded,altchars=b'-_',validate=True)
+   if len(blob)<28:raise ValueError()
+   result=json.loads(AESGCM(key).decrypt(blob[:12],blob[12:],aad))
+   if not isinstance(result,dict):raise ValueError()
+   return result
+  nonce=secrets.token_bytes(12);aad=(binding+':v1:'+current).encode()
+  encrypted=base64.urlsafe_b64encode(nonce+AESGCM(keys[current]).encrypt(nonce,json.dumps(value).encode(),aad)).decode()
+  return 'v1:'+current+':'+encrypted
  except Exception:raise ValueError('Exchange credentials could not be decrypted. Reconnect this account.') from None
+
+def rewrap_credentials(c,uid):
+ """Re-encrypt an owner's records with the active key; caller owns transaction.
+ Retain previous keys until every account and required backup has been migrated.
+ """
+ rows=list(c.execute('SELECT id,credentials FROM exchange_connections WHERE user_id=?',(uid,)))
+ updates=[(crypt(uid,row['id'],crypt(uid,row['id'],row['credentials'],True)),uid,row['id']) for row in rows]
+ for encrypted,owner,identity in updates:c.execute('UPDATE exchange_connections SET credentials=? WHERE user_id=? AND id=?',(encrypted,owner,identity))
+ return len(updates)
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
  def redirect_request(self,*args,**kwargs):return None
@@ -94,7 +133,7 @@ def snapshot(key,secret):
  return {'balances':balances,'updated_at':int(time.time()),'coverage':'Binance Spot free + locked balances only. Earn, futures, margin and historical cost basis are not included. Manual refresh.','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
 
 def state(c,uid):
- try:master_key();configured=True
+ try:encryption_keys();configured=True
  except ValueError:configured=False
  connections=[]
  for row in c.execute('SELECT id,label,snapshot FROM exchange_connections WHERE user_id=? ORDER BY label,id',(uid,)):

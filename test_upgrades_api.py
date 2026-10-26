@@ -21,6 +21,22 @@ class UpgradeTests(base.APITests):
   with self.assertRaises(urllib.error.HTTPError) as e:self.call(self.a,'state')
   self.assertEqual(e.exception.code,401)
   self.call(self.a,'login',{'email':'a@test.com','password':'updated-password-456'})
+ def test_exchange_connect_sync_disconnect_and_credential_isolation(self):
+  import os,base64,json,server
+  key='a'*64;secret='b'*64
+  snapshot={'balances':[{'asset':'BTC','quantity':'0.25','value_usd':'20000','price_usd':80000}],'updated_at':123,'permissions_verified':True}
+  with patch.dict(os.environ,{'ORBIT_EXCHANGE_KEY':base64.urlsafe_b64encode(bytes(range(32))).decode(),'ORBIT_EXCHANGE_KEY_ID':'test','ORBIT_EXCHANGE_PREVIOUS_KEYS':'{}'}),patch('exchange_connections.snapshot',return_value=snapshot):
+   result=self.call(self.a,'exchange-connect',{'label':'Binance fixture','api_key':key,'api_secret':secret})
+   connection=result['connections'][0];identity=connection['id']
+   self.assertNotIn(key,json.dumps(result));self.assertNotIn(secret,json.dumps(result))
+   state=self.call(self.a,'state');self.assertEqual(state['exchanges'][0]['snapshot']['balances'][0]['quantity'],'0.25')
+   self.assertEqual(self.call(self.b,'state')['exchanges'],[])
+   with server.connect() as c:
+    stored=c.execute('SELECT credentials FROM exchange_connections WHERE id=?',(identity,)).fetchone()[0]
+    self.assertTrue(stored.startswith('v1:test:'));self.assertNotIn(key,stored);self.assertNotIn(secret,stored)
+   with self.assertRaises(urllib.error.HTTPError):self.call(self.b,'exchange-sync',{'id':identity})
+   refreshed=self.call(self.a,'exchange-sync',{'id':identity});self.assertEqual(len(refreshed['connections']),1)
+   self.call(self.a,'exchange-delete',{'id':identity});self.assertEqual(self.call(self.a,'state')['exchanges'],[])
  def test_exchange_state_no_secret(self):
   result=self.call(self.a,'exchange-state',{});self.assertEqual(result['connections'],[]);self.assertNotIn('credentials',str(result))
 
