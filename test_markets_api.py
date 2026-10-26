@@ -27,7 +27,7 @@ class MarketsAPITests(test_integrations.APITests):
    self.assertEqual(e.exception.code,400);chart.assert_not_called()
  def test_shared_cache_and_source_files(self):
   server.market_cache_write(('list',),{'coins':[],'fetched_at':123});self.assertEqual(server.market_cache_read(('list',))['fetched_at'],123)
-  for path in ['/market_dashboard.js','/market_dashboard.css']:
+  for path in ['/market_dashboard.js','/market_dashboard.css','/indicator_library.js']:
    with urllib.request.urlopen('http://127.0.0.1:'+str(self.app.server_port)+path) as r:self.assertEqual(r.status,200);self.assertIn("script-src 'self'",r.headers['Content-Security-Policy'])
   with self.assertRaises(urllib.error.HTTPError):urllib.request.urlopen('http://127.0.0.1:'+str(self.app.server_port)+'/coin_market.py')
 if __name__=='__main__':unittest.main()

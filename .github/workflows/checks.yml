@@ -36,5 +36,6 @@ jobs:
       - run: node quote_refresh.test.cjs
       - run: node experience_ui.test.cjs
       - run: node coin_alerts.test.cjs
+      - run: node indicator_library.test.cjs
       - run: node pine_bridge.test.cjs
       - run: node pine_editor.test.cjs

@@ -120,4 +120,9 @@ class NewIntervalTests(unittest.TestCase):
   with patch('providers.request_json',side_effect=[self.meta('coinbase'),[cb(start),cb(start+21600)]]) as req:result=e.chart('bitcoin',1,'candles','coinbase','6h')
   self.assertEqual(result['interval_seconds'],21600);self.assertIn('granularity=21600',req.call_args.args[0])
 
+ def test_weekly_all_has_enough_real_bars_for_ema200(self):
+  last=e.bucket_start(NOW,604800);rows=[bn((last-(400-i)*604800)*1000) for i in range(401)]
+  with patch('providers.request_json',side_effect=[self.meta(),rows]) as request:result=e.chart('bitcoin','max','candles','binance','1w')
+  self.assertEqual(len(result['candles']),401);self.assertEqual(result['interval_seconds'],604800);self.assertIn('startTime=0',request.call_args.args[0]);self.assertIn('interval=1w',request.call_args.args[0])
+
 if __name__=='__main__':unittest.main()

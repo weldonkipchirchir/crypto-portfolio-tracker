@@ -1,0 +1,148 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//@version=6
+// BTC MIN/MAX short-hold strategy, inspired by the published Quantpedia / academic "MIN and MAX in Bitcoin" idea:
+//   MAX leg (trend):          close equals the N-day high  -> go long, hold a short time
+//   MIN leg (mean reversion): close equals the N-day low   -> go long, hold a short time
+// The 200-day trend filter on the MIN leg and the ATR stop are MY additions, not part of the original rule. Designed for the DAILY chart.
+strategy("BTC MIN/MAX Short-Hold (Daily, long-only)", overlay = true, initial_capital = 10000,
+     commission_type = strategy.commission.percent, commission_value = 0.1, slippage = 2,
+     calc_on_every_tick = false, margin_long = 0, margin_short = 0, max_labels_count = 500)
+
+// ===================== INPUTS =====================
+grpSig = "Signals"
+lb        = input.int(10, "MIN/MAX lookback (days)", minval = 3, group = grpSig)
+useMax    = input.bool(true, "MAX leg: buy when close = N-day high (trend)", group = grpSig)
+useMin    = input.bool(true, "MIN leg: buy when close = N-day low (mean reversion)", group = grpSig)
+minFilter = input.bool(true, "MIN leg only when close is above the long SMA", group = grpSig, tooltip = "Avoids buying dips in a downtrend, where 'cheap' keeps getting cheaper. My addition, not in the original rule.")
+smaLen    = input.int(200, "Long SMA length", group = grpSig)
+
+grpRisk = "Holding & risk"
+holdDays = input.int(1, "Hold for N days", minval = 1, group = grpRisk)
+useStop  = input.bool(true, "Use protective ATR stop", group = grpRisk)
+atrLen   = input.int(14, "ATR length", group = grpRisk)
+stopAtr  = input.float(2.5, "Stop distance (x ATR)", step = 0.5, group = grpRisk)
+posPct   = input.float(95.0, "Position size (% of equity, no leverage)", minval = 5, maxval = 100, group = grpRisk)
+
+grpTest = "Backtest"
+startTime = input.time(timestamp("2018-01-01"), "Backtest start", group = grpTest)
+allowIntraday = input.bool(false, "Allow non-daily charts (results will NOT match the design)", group = grpTest)
+showDash  = input.bool(true, "Show interpretation dashboard (top left)", group = grpTest)
+showStats = input.bool(true, "Show stats table (top right)", group = grpTest)
+
+// ===================== SIGNALS =====================
+smaLong = ta.sma(close, smaLen)
+atrVal  = ta.atr(atrLen)
+hiN     = ta.highest(close, lb)
+loN     = ta.lowest(close, lb)
+
+isMax = close >= hiN
+isMin = close <= loN
+legMax = useMax and isMax
+legMin = useMin and isMin and (not minFilter or close > smaLong)
+sig    = legMax or legMin
+
+inRange = time >= startTime
+tfSec   = timeframe.in_seconds()
+
+// ===================== ORDERS =====================
+var int entryBar = 0
+
+if sig and inRange and (allowIntraday or tfSec >= 86400) and strategy.position_size == 0 and not na(atrVal)
+    qty = strategy.equity * posPct / 100 / close
+    strategy.entry("Long", strategy.long, qty = qty, comment = legMax ? "MAX leg" : "MIN leg")
+    if useStop
+        strategy.exit("Stop", "Long", stop = close - stopAtr * atrVal)
+
+if strategy.position_size > 0 and strategy.position_size[1] == 0
+    entryBar := bar_index
+
+if strategy.position_size > 0 and bar_index - entryBar >= holdDays - 1
+    strategy.close("Long", comment = "Time exit")
+
+// ===================== PLOTS =====================
+plot(smaLong, "Long SMA", color = color.orange, linewidth = 2)
+plot(hiN, "N-day high (close)", color = color.new(color.teal, 50))
+plot(loN, "N-day low (close)", color = color.new(color.red, 50))
+plotshape(legMax and inRange, "MAX signal", shape.triangleup, location.belowbar, color.lime, size = size.small)
+plotshape(legMin and not legMax and inRange, "MIN signal", shape.diamond, location.belowbar, color.aqua, size = size.small)
+
+// ===================== DASHBOARD (TOP LEFT) =====================
+var table dash = table.new(position.top_left, 2, 8, border_width = 1, border_color = color.gray, frame_width = 2, frame_color = color.gray, bgcolor = color.new(color.black, 10))
+
+if barstate.islast and showDash
+    table.cell(dash, 0, 0, "CHECK", bgcolor = color.new(color.blue, 50), text_color = color.white, text_size = size.small)
+    table.cell(dash, 1, 0, "STATUS (final at daily close)", bgcolor = color.new(color.blue, 50), text_color = color.white, text_size = size.small)
+
+    above = close > smaLong
+    table.cell(dash, 0, 1, "Price vs " + str.tostring(smaLen) + " SMA", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 1, above ? "ABOVE (uptrend, dips allowed)" : "BELOW (downtrend, MIN leg blocked)", text_size = size.small, text_color = above ? color.green : color.red)
+
+    rangePos = hiN > loN ? (close - loN) / (hiN - loN) * 100 : 50.0
+    table.cell(dash, 0, 2, str.tostring(lb) + "-day range position", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 2, str.tostring(rangePos, "#") + "%  (0 = at low, 100 = at high)", text_size = size.small, text_color = rangePos >= 100 ? color.lime : rangePos <= 0 ? color.aqua : color.silver)
+
+    table.cell(dash, 0, 3, "MAX leg (trend)", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 3, not useMax ? "Off" : isMax ? "TRIGGERED: close at N-day high" : "No", text_size = size.small, text_color = not useMax ? color.gray : isMax ? color.lime : color.silver)
+
+    minTxt = not useMin ? "Off" : isMin ? (minFilter and not above ? "Close at N-day low but BLOCKED by trend filter" : "TRIGGERED: close at N-day low") : "No"
+    table.cell(dash, 0, 4, "MIN leg (mean reversion)", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 4, minTxt, text_size = size.small, text_color = not useMin ? color.gray : legMin ? color.aqua : isMin ? color.orange : color.silver)
+
+    posTxt = strategy.position_size > 0 ? "LONG open since " + str.tostring(bar_index - entryBar) + " bar(s), exits after " + str.tostring(holdDays) + " day(s) or stop" : "Flat"
+    table.cell(dash, 0, 5, "Open trade", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 5, posTxt, text_size = size.small, text_color = strategy.position_size > 0 ? color.green : color.gray)
+
+    verdict = sig ? "SIGNAL: buy at next open, hold " + str.tostring(holdDays) + " day(s)" : "WAIT: no MIN or MAX trigger today"
+    table.cell(dash, 0, 6, "VERDICT", text_size = size.small, text_color = color.white, bgcolor = color.new(color.green, 70))
+    table.cell(dash, 1, 6, verdict, text_size = size.small, text_color = sig ? color.lime : color.white, bgcolor = color.new(color.green, 70))
+
+    isDaily = tfSec >= 86400
+    table.cell(dash, 0, 7, "TIMEFRAME", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 7, isDaily ? "OK: daily" : (allowIntraday ? "WARNING: built for 1D, results will not match the design." : "Orders paused: built for 1D. Switch to 1D."), text_size = size.small, text_color = isDaily ? color.green : color.red)
+
+// ===================== STATS TABLE (TOP RIGHT) =====================
+var float startPrice = na
+if na(startPrice) and inRange
+    startPrice := close
+
+var table stats = table.new(position.top_right, 2, 9, border_width = 1, border_color = color.gray, frame_width = 2, frame_color = color.gray, bgcolor = color.new(color.black, 10))
+
+if barstate.islast and showStats
+    nTrades = strategy.closedtrades
+    wins    = strategy.wintrades
+    losses  = strategy.losstrades
+    winRate = nTrades > 0 ? wins / nTrades * 100 : na
+    avgWin  = wins > 0 ? strategy.grossprofit / wins : na
+    avgLoss = losses > 0 ? strategy.grossloss / losses : na
+    pf      = strategy.grossloss > 0 ? strategy.grossprofit / strategy.grossloss : na
+    perTrade = nTrades > 0 ? strategy.netprofit / nTrades : na
+    netPct  = strategy.netprofit / strategy.initial_capital * 100
+    ddPct   = strategy.max_drawdown / strategy.initial_capital * 100
+    bhPct   = not na(startPrice) ? (close / startPrice - 1) * 100 : na
+
+    table.cell(stats, 0, 0, "STRATEGY STATS", bgcolor = color.new(color.blue, 50), text_color = color.white, text_size = size.small)
+    table.cell(stats, 1, 0, "(closed trades)", bgcolor = color.new(color.blue, 50), text_color = color.white, text_size = size.small)
+
+    table.cell(stats, 0, 1, "Trades", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 1, str.tostring(nTrades) + (nTrades < 30 ? "  (too few to trust)" : ""), text_size = size.small, text_color = nTrades < 30 ? color.orange : color.green)
+
+    table.cell(stats, 0, 2, "Win rate", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 2, na(winRate) ? "-" : str.tostring(winRate, "#.#") + "%", text_size = size.small, text_color = color.white)
+
+    table.cell(stats, 0, 3, "Avg win / avg loss (USDT)", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 3, (na(avgWin) ? "-" : str.tostring(avgWin, "#")) + " / " + (na(avgLoss) ? "-" : str.tostring(avgLoss, "#")), text_size = size.small, text_color = color.white)
+
+    table.cell(stats, 0, 4, "Avg result per trade (USDT)", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 4, na(perTrade) ? "-" : str.tostring(perTrade, "#.#"), text_size = size.small, text_color = na(perTrade) ? color.gray : perTrade > 0 ? color.green : color.red)
+
+    table.cell(stats, 0, 5, "Profit factor", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 5, na(pf) ? "-" : str.tostring(pf, "#.##") + (pf >= 1.3 ? "  (good)" : pf >= 1.0 ? "  (marginal)" : "  (losing)"), text_size = size.small, text_color = na(pf) ? color.gray : pf >= 1.3 ? color.green : pf >= 1.0 ? color.orange : color.red)
+
+    table.cell(stats, 0, 6, "Net profit", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 6, str.tostring(netPct, "#.##") + "%", text_size = size.small, text_color = netPct >= 0 ? color.green : color.red)
+
+    table.cell(stats, 0, 7, "Max drawdown", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 7, str.tostring(ddPct, "#.##") + "%", text_size = size.small, text_color = ddPct > 25 ? color.red : color.orange)
+
+    table.cell(stats, 0, 8, "Buy & Hold (same period)", text_size = size.small, text_color = color.white)
+    table.cell(stats, 1, 8, na(bhPct) ? "-" : str.tostring(bhPct, "#.#") + "%", text_size = size.small, text_color = color.gray)
