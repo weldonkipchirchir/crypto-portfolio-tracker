@@ -1,0 +1,224 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//@version=6
+indicator("Combo Dashboard v7 (Scored Signals)", overlay = false, shorttitle = "Dashboard v7", max_labels_count = 500)
+
+// ===================== INPUTS =====================
+grpEma = "Trend Filter (EMA)"
+showEma50  = input.bool(true, "Show EMA 50", group = grpEma)
+showEma200 = input.bool(true, "Show EMA 200", group = grpEma)
+trendMode  = input.string("EMA 50 vs 200", "Trend filter", options = ["EMA 200", "EMA 50 vs 200", "Off"], group = grpEma)
+
+grpHtf = "Higher Timeframe Filter"
+useHtf   = input.bool(true, "Require higher-timeframe trend agreement", group = grpHtf)
+htfInput = input.timeframe("", "Higher timeframe (blank = auto one step up)", group = grpHtf)
+htfLen   = input.int(50, "HTF EMA length", group = grpHtf, tooltip = "Uses the previous CLOSED HTF bar, so it does not repaint.")
+
+grpBb = "Volatility (Bollinger Bands)"
+showBb = input.bool(true, "Show Bollinger Bands", group = grpBb)
+bbLen  = input.int(20, "BB Length", group = grpBb)
+bbMult = input.float(2.0, "BB StdDev Multiplier", group = grpBb)
+
+grpRsi = "Momentum (RSI)"
+showRsi = input.bool(false, "Show RSI Pane", group = grpRsi)
+rsiLen  = input.int(14, "RSI Length", group = grpRsi)
+rsiBuy  = input.int(35, "RSI dip level (buy)", group = grpRsi)
+rsiSell = input.int(65, "RSI spike level (sell)", group = grpRsi)
+
+grpMacd = "Momentum (MACD)"
+showMacd    = input.bool(true, "Show MACD Pane", group = grpMacd)
+macdFastLen = input.int(12, "MACD Fast Length", group = grpMacd)
+macdSlowLen = input.int(26, "MACD Slow Length", group = grpMacd)
+macdSigLen  = input.int(9, "MACD Signal Length", group = grpMacd)
+macdZero    = input.bool(true, "Buys need cross below 0 / sells above 0", group = grpMacd, tooltip = "Pullback entries are stronger when the MACD cross happens away from the zero line.")
+
+grpSig = "Signal Settings"
+lookback  = input.int(6, "Dip/Spike memory (bars)", minval = 1, group = grpSig)
+cooldown  = input.int(10, "Min bars between signals", minval = 1, group = grpSig)
+minScore  = input.int(4, "Min score for STRONG signal (of 5)", minval = 1, maxval = 5, group = grpSig)
+showEarly = input.bool(true, "Show EARLY (lower score) signals", group = grpSig)
+earlyMin  = input.int(2, "Min score for EARLY signal", minval = 0, maxval = 5, group = grpSig)
+
+grpFilt = "Filters (each is worth 1 score point)"
+useAdx   = input.bool(true, "ADX strength + direction (+DI / -DI)", group = grpFilt)
+adxLen   = input.int(14, "ADX Length", group = grpFilt)
+adxMin   = input.int(20, "Min ADX", group = grpFilt)
+useVol   = input.bool(true, "Volume above average", group = grpFilt)
+volLen   = input.int(20, "Volume average length", group = grpFilt)
+useSqz   = input.bool(true, "Skip squeeze / chop regime", group = grpFilt)
+sqzMin   = input.int(20, "Min BB-width percentile (0-100)", minval = 0, maxval = 100, group = grpFilt, tooltip = "Signals lose a point when Bollinger bandwidth is in the bottom X% of its last 100 bars.")
+
+grpRisk = "Targets & Stops"
+showLabels = input.bool(true, "Show labels with SL/TP", group = grpRisk)
+atrLen     = input.int(14, "ATR Length", group = grpRisk)
+slMode     = input.string("Swing", "Stop mode", options = ["Swing", "ATR"], group = grpRisk)
+slMult     = input.float(1.5, "ATR mode: Stop (x ATR)", group = grpRisk)
+swingLen   = input.int(10, "Swing mode: lookback bars", group = grpRisk)
+maxRiskAtr = input.float(3.0, "Swing mode: max risk (x ATR)", group = grpRisk)
+rrTarget   = input.float(2.0, "Take profit (R multiple)", group = grpRisk)
+
+grpMisc = "Display"
+showVwap = input.bool(true, "Show VWAP (intraday only)", group = grpMisc)
+showDash = input.bool(true, "Show dashboard", group = grpMisc)
+
+// ===================== CALCULATIONS =====================
+ema50Val  = ta.ema(close, 50)
+ema200Val = ta.ema(close, 200)
+[bbMiddle, bbUpper, bbLower] = ta.bb(close, bbLen, bbMult)
+rsiVal = ta.rsi(close, rsiLen)
+[macdLine, signalLine, macdHist] = ta.macd(close, macdFastLen, macdSlowLen, macdSigLen)
+vwapVal = ta.vwap(hlc3)
+[diPlus, diMinus, adxVal] = ta.dmi(adxLen, adxLen)
+atrVal = ta.atr(atrLen)
+
+bullCross = ta.crossover(macdLine, signalLine)
+bearCross = ta.crossunder(macdLine, signalLine)
+
+// Auto higher timeframe: always one step above the chart
+tfSec  = timeframe.in_seconds()
+autoTf = tfSec <= 900 ? "60" : tfSec <= 3600 ? "240" : tfSec <= 14400 ? "D" : tfSec <= 86400 ? "W" : "M"
+htfTf  = htfInput == "" ? autoTf : htfInput
+
+[htfClose, htfEma] = request.security(syminfo.tickerid, htfTf, [close[1], ta.ema(close, htfLen)[1]], lookahead = barmerge.lookahead_on)
+htfUp   = not useHtf or htfClose > htfEma
+htfDown = not useHtf or htfClose < htfEma
+
+// Volume and regime
+volAvg   = ta.sma(volume, volLen)
+volOk    = not useVol or na(volume) or volume > volAvg
+bbWidth  = (bbUpper - bbLower) / bbMiddle
+bbRank   = ta.percentrank(bbWidth, 100)
+regimeOk = not useSqz or bbRank >= sqzMin
+
+// ===================== SIGNAL LOGIC =====================
+dipNow      = low < bbLower or rsiVal < rsiBuy
+spikeNow    = high > bbUpper or rsiVal > rsiSell
+dipRecent   = ta.barssince(dipNow) <= lookback
+spikeRecent = ta.barssince(spikeNow) <= lookback
+
+trendUp = switch trendMode
+    "EMA 200"       => close > ema200Val
+    "EMA 50 vs 200" => ema50Val > ema200Val
+    => true
+trendDown = switch trendMode
+    "EMA 200"       => close < ema200Val
+    "EMA 50 vs 200" => ema50Val < ema200Val
+    => true
+
+adxBuyOk  = not useAdx or (adxVal >= adxMin and diPlus > diMinus)
+adxSellOk = not useAdx or (adxVal >= adxMin and diMinus > diPlus)
+
+// Mandatory trigger: recent dip/spike + MACD cross (+ optional zero-line side)
+buyTrigger  = barstate.isconfirmed and dipRecent and bullCross and (not macdZero or macdLine < 0)
+sellTrigger = barstate.isconfirmed and spikeRecent and bearCross and (not macdZero or macdLine > 0)
+
+// Score: 5 independent-ish checks
+buyScore  = (trendUp ? 1 : 0) + (htfUp ? 1 : 0) + (adxBuyOk ? 1 : 0) + (volOk ? 1 : 0) + (regimeOk ? 1 : 0)
+sellScore = (trendDown ? 1 : 0) + (htfDown ? 1 : 0) + (adxSellOk ? 1 : 0) + (volOk ? 1 : 0) + (regimeOk ? 1 : 0)
+
+var int lastDir = 0
+var int lastBar = -1000
+
+strongBuy  = buyTrigger  and buyScore  >= minScore and lastDir != 1  and bar_index - lastBar >= cooldown
+strongSell = sellTrigger and sellScore >= minScore and lastDir != -1 and bar_index - lastBar >= cooldown
+
+if strongBuy
+    lastDir := 1
+    lastBar := bar_index
+if strongSell
+    lastDir := -1
+    lastBar := bar_index
+
+earlyBuy  = showEarly and buyTrigger  and not strongBuy and not strongSell and buyScore  >= earlyMin
+earlySell = showEarly and sellTrigger and not strongBuy and not strongSell and sellScore >= earlyMin
+
+// ===================== TARGETS =====================
+swingLow  = ta.lowest(low, swingLen)
+swingHigh = ta.highest(high, swingLen)
+
+buyRisk  = slMode == "ATR" ? atrVal * slMult : math.min(close - swingLow + atrVal * 0.25, atrVal * maxRiskAtr)
+sellRisk = slMode == "ATR" ? atrVal * slMult : math.min(swingHigh - close + atrVal * 0.25, atrVal * maxRiskAtr)
+
+buySL  = close - buyRisk
+buyTP  = close + buyRisk * rrTarget
+sellSL = close + sellRisk
+sellTP = close - sellRisk * rrTarget
+
+// ===================== PLOTS (MAIN CHART) =====================
+plot(showEma50 ? ema50Val : na, "EMA 50", color = color.blue, linewidth = 2, force_overlay = true)
+plot(showEma200 ? ema200Val : na, "EMA 200", color = color.orange, linewidth = 2, force_overlay = true)
+plot(showVwap and timeframe.isintraday ? vwapVal : na, "VWAP", color = color.fuchsia, linewidth = 2, style = plot.style_cross, force_overlay = true)
+
+pUpper = plot(showBb ? bbUpper : na, "BB Upper", color = color.new(color.gray, 50), force_overlay = true)
+pLower = plot(showBb ? bbLower : na, "BB Lower", color = color.new(color.gray, 50), force_overlay = true)
+fill(pUpper, pLower, color = color.new(color.gray, 90), title = "BB Fill")
+
+plotshape(strongBuy,  "Strong Buy",  shape.triangleup,   location.belowbar, color.lime, size = size.normal, force_overlay = true)
+plotshape(strongSell, "Strong Sell", shape.triangledown, location.abovebar, color.red,  size = size.normal, force_overlay = true)
+plotshape(earlyBuy,   "Early Buy",   shape.triangleup,   location.belowbar, color.new(color.teal, 20),   size = size.tiny, force_overlay = true)
+plotshape(earlySell,  "Early Sell",  shape.triangledown, location.abovebar, color.new(color.maroon, 20), size = size.tiny, force_overlay = true)
+
+if showLabels and strongBuy
+    label.new(bar_index, low, "BUY " + str.tostring(buyScore) + "/5 @ " + str.tostring(close, format.mintick) + "\nSL: " + str.tostring(buySL, format.mintick) + "\nTP: " + str.tostring(buyTP, format.mintick) + " (" + str.tostring(rrTarget, "#.#") + "R)",
+         style = label.style_label_up, color = color.green, textcolor = color.white, size = size.small, force_overlay = true)
+
+if showLabels and strongSell
+    label.new(bar_index, high, "SELL " + str.tostring(sellScore) + "/5 @ " + str.tostring(close, format.mintick) + "\nSL: " + str.tostring(sellSL, format.mintick) + "\nTP: " + str.tostring(sellTP, format.mintick) + " (" + str.tostring(rrTarget, "#.#") + "R)",
+         style = label.style_label_down, color = color.red, textcolor = color.white, size = size.small, force_overlay = true)
+
+bgcolor(adxVal > 25 ? color.new(color.gray, 95) : na, title = "Strong Trend Filter")
+
+// ===================== PLOTS (SEPARATE PANE) =====================
+rsiDisplay = showRsi ? display.all : display.none
+
+plot(showRsi ? rsiVal : na, "RSI", color = color.purple, display = rsiDisplay)
+hline(70, "RSI Overbought", color = color.red, linestyle = hline.style_dashed, display = rsiDisplay)
+hline(30, "RSI Oversold", color = color.green, linestyle = hline.style_dashed, display = rsiDisplay)
+
+plot(showMacd ? macdLine : na, "MACD Line", color = color.blue, linewidth = 1)
+plot(showMacd ? signalLine : na, "MACD Signal", color = color.orange, linewidth = 1)
+plot(showMacd ? macdHist : na, "MACD Histogram", color = macdHist >= 0 ? color.new(color.green, 50) : color.new(color.red, 50), style = plot.style_columns)
+
+// ===================== ALERTS =====================
+alertcondition(strongBuy,  "Strong BUY",  "Strong BUY signal on {{ticker}} ({{interval}})")
+alertcondition(strongSell, "Strong SELL", "Strong SELL signal on {{ticker}} ({{interval}})")
+alertcondition(earlyBuy,   "Early BUY",   "Early BUY on {{ticker}} ({{interval}})")
+alertcondition(earlySell,  "Early SELL",  "Early SELL on {{ticker}} ({{interval}})")
+
+// ===================== DASHBOARD TABLE =====================
+var table dash = table.new(position.top_left, 2, 9, border_width = 1, border_color = color.gray, frame_width = 2, frame_color = color.gray, bgcolor = color.new(color.black, 10))
+
+if barstate.islast and showDash
+    table.cell(dash, 0, 0, "CHECK", bgcolor = color.new(color.blue, 50), text_color = color.white, text_size = size.small)
+    table.cell(dash, 1, 0, "STATUS (live bar)", bgcolor = color.new(color.blue, 50), text_color = color.white, text_size = size.small)
+
+    trendTxt = trendUp and not trendDown ? "BULLISH" : trendDown and not trendUp ? "BEARISH" : "Neutral / off"
+    trendCol = trendUp and not trendDown ? color.green : trendDown and not trendUp ? color.red : color.gray
+    table.cell(dash, 0, 1, "Chart trend (" + trendMode + ")", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 1, trendTxt, text_size = size.small, text_color = trendCol)
+
+    htfTxt = not useHtf ? "Filter off" : htfClose > htfEma ? htfTf + " BULLISH" : htfClose < htfEma ? htfTf + " BEARISH" : htfTf + " neutral"
+    htfCol = not useHtf ? color.gray : htfClose > htfEma ? color.green : htfClose < htfEma ? color.red : color.gray
+    table.cell(dash, 0, 2, "Higher timeframe", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 2, htfTxt, text_size = size.small, text_color = htfCol)
+
+    adxDir = diPlus > diMinus ? "+DI leads (bulls)" : "-DI leads (bears)"
+    adxTxt = "ADX " + str.tostring(adxVal, "#.#") + " | " + (adxVal >= adxMin ? adxDir : "Choppy, below min")
+    adxCol = adxVal < adxMin ? color.red : diPlus > diMinus ? color.green : color.orange
+    table.cell(dash, 0, 3, "Trend strength", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 3, adxTxt, text_size = size.small, text_color = adxCol)
+
+    table.cell(dash, 0, 4, "Volume", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 4, not useVol ? "Filter off" : volOk ? "Above average" : "Below average", text_size = size.small, text_color = not useVol ? color.gray : volOk ? color.green : color.red)
+
+    table.cell(dash, 0, 5, "Regime (BB width pctile)", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 5, str.tostring(bbRank, "#") + (regimeOk ? " | Expanding / OK" : " | Squeeze / chop"), text_size = size.small, text_color = regimeOk ? color.green : color.red)
+
+    table.cell(dash, 0, 6, "BUY score", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 6, str.tostring(buyScore) + " / 5" + (buyScore >= minScore ? "  (eligible)" : "  (blocked)"), text_size = size.small, text_color = buyScore >= minScore ? color.green : color.gray)
+
+    table.cell(dash, 0, 7, "SELL score", text_size = size.small, text_color = color.white)
+    table.cell(dash, 1, 7, str.tostring(sellScore) + " / 5" + (sellScore >= minScore ? "  (eligible)" : "  (blocked)"), text_size = size.small, text_color = sellScore >= minScore ? color.red : color.gray)
+
+    verdict = buyScore >= minScore and buyScore > sellScore ? "Longs allowed - wait for dip + MACD cross" : sellScore >= minScore and sellScore > buyScore ? "Shorts allowed - wait for spike + MACD cross" : "No side qualifies - stand aside"
+    table.cell(dash, 0, 8, "VERDICT", text_size = size.small, text_color = color.white, bgcolor = color.new(color.green, 70))
+    table.cell(dash, 1, 8, verdict, text_size = size.small, text_color = color.white, bgcolor = color.new(color.green, 70))

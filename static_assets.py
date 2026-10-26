@@ -17,3 +17,5 @@ for filename in ("favicon-32.png","favicon-48.png","favicon-96.png","apple-touch
 STATIC_FILES.update({"/guides/import-crypto-trades-csv.html":("guides/import-crypto-trades-csv.html","text/html; charset=utf-8"),"/examples/orbit-trades.csv":("examples/orbit-trades.csv","text/csv; charset=utf-8")})
 
 STATIC_FILES["/workspace_polish.css"]=("workspace_polish.css","text/css; charset=utf-8")
+
+STATIC_FILES["/combo_dashboard.js"]=("combo_dashboard.js","text/javascript; charset=utf-8")

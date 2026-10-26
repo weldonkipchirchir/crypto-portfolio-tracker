@@ -1,0 +1,16 @@
+const assert=require('node:assert/strict');
+require('./pine_bridge.js');require('./combo_dashboard.js');require('./chart_panels.js');require('./chart_tools.js');
+const d=OrbitComboDashboard,day=86400000;
+const rows=Array.from({length:240},(_,i)=>({timestamp:(200+i/6)*day,open:100+i,high:102+i,low:99+i,close:101+i,volume:String(100+i)}));
+const higher=Array.from({length:300},(_,i)=>({timestamp:i*day,close:100+i}));
+assert(d.matches(d.source));assert(d.matches('\ufeff'+d.source.replace(/\n/g,'\r\n')));assert(!d.matches(d.source.replace('minScore  = input.int(4','minScore  = input.int(3')));
+assert.equal(d.higher('4h'),'1d');assert.equal(d.higher('1d'),'1w');assert.equal(d.higher('1w'),null);
+let result=d.calculate(rows,{interval:'4h',higherRows:higher});assert.equal(result.known,5);assert.equal(result.buy,4);assert.equal(result.rank,1);assert(Math.abs(result.adx-100)<1e-8);assert(result.checks[1].text.includes('previous closed bar'));assert(result.verdict.includes('trigger not evaluated'));
+const changed=higher.map((r,i)=>i>=239?{...r,close:1e9}:r);assert.equal(d.calculate(rows,{interval:'4h',higherRows:changed}).checks[1].text,result.checks[1].text);
+const missing=d.calculate(rows.map(r=>({...r,volume:null})),{interval:'4h'});assert.equal(missing.known,3);assert(missing.verdict.includes('Incomplete data'));assert(!missing.verdict.includes('qualify'));assert(d.html(missing).includes('2 unknown'));
+assert.throws(()=>d.calculate(rows.map(r=>({...r,open:undefined}))));
+// Exercise real Studio state transitions and save/load of per-plot removal.
+let dialog,saved;const fields={};global.document={querySelector:()=>null,createElement:()=>dialog={innerHTML:'',className:'',classList:{toggle(){}},querySelector:s=>fields[s]||(fields[s]={value:'',setAttribute(){},textContent:'',getBoundingClientRect:()=>({left:0,top:0,width:1000,height:352}),viewBox:{baseVal:{width:1000,height:352}}}),addEventListener(){},showModal(){this.open=true},close(){this.open=false},remove(){}},body:{append(){}}};
+OrbitChartTools.open({autoRestore:false,rows,candles:true,source:'binance',quote:'USDT',coinId:'bitcoin',intervalCode:'4h',saveSetup:async(k,v)=>saved=JSON.parse(JSON.stringify(v)),loadSetup:async()=>saved,loadHigherTimeframe:async()=>({rows:higher,source:'binance',quote:'USDT'})});
+const action=(ot,extra={})=>dialog.onclick({target:{closest:()=>({dataset:{ot,...extra}})}});
+(async()=>{await action('dashboard');assert(dialog.innerHTML.includes('Dashboard v7 · native preset'));await action('remove-study',{study:'EMA(50)'});await action('remove-custom',{index:'0'});await action('save');assert(!saved.script.includes('EMA(50)'));assert.deepEqual(saved.hiddenPinePlots,[0]);assert.equal(saved.dashboardEnabled,true);await action('load');assert(!dialog.innerHTML.includes('aria-label="Remove custom Basis"'));assert(dialog.innerHTML.includes('aria-label="Remove custom Upper"'));await action('dashboard-remove');assert(!dialog.innerHTML.includes('aria-label="Dashboard v7 default filter checks"'));console.log('Dashboard math, source matching, closed-HTF isolation, missing-data gating and persisted indicator removal passed.');})().catch(e=>{console.error(e);process.exitCode=1});

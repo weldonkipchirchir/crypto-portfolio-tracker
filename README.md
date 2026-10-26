@@ -88,3 +88,12 @@ Markets loads up to 250 CoinGecko market-cap-ranked coins with search, sorting a
 
 
 Market research: see [RESEARCH.md](RESEARCH.md) for sentiment, narratives, RSI, exchange structure, funding/open interest, watchlists and recorded trade overlays, including public-feed coverage limits.
+
+
+### Chart studies and Dashboard v7
+
+Chart Studio has 41 curated study choices and individual × controls in the indicator legend. Removing a built-in study updates its saved configuration. Removing one custom plot is retained on interval reload and setup restore; applying its source again resets those per-plot removals. Drawings are independent.
+
+The exact supplied Combo Dashboard v7 (Scored Signals) source can apply an explicitly labeled Orbit-native default-filter preset. A toolbar/library entry provides the same preset. It shows EMA trend, previous-closed-higher-timeframe trend, ADX/DMI, volume average, Bollinger-width percentile and five-check scores. Higher-timeframe candles come from a separate same-source request and never use a bar that closes after the current chart-bar timestamp. Monthly HTF is unavailable. Missing data prevents an eligibility verdict. EMA initialization follows Orbit’s loaded-history/Pine subset behavior; short histories remain seed-dependent.
+
+This is not general Pine execution. Edited versions use the normal supported subset. The preset does not run the supplied MACD/dip signal triggers, last-direction/cooldown state, stop/target labels, VWAP plot, shapes, Pine alerts or strategy orders. Missing volume is treated conservatively as unknown rather than passing the original script’s missing-volume condition. These limitations are visible in the UI. Source attribution and MPL 2.0 notice are retained in combo_dashboard.js and fixtures/combo-dashboard-v7-scored.pine.
