@@ -235,7 +235,7 @@ class Handler(BaseHTTPRequestHandler):
   static=STATIC_FILES
   if self.path in static:
    filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
-   if filename=='index.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
+   if filename=='app.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
    self.send_response(200); self.send_header('Content-Type',kind); self.end_headers(); self.wfile.write(body); return
   if self.path!='/api/state': self.send(404,{'error':'Not found'}); return
   with connect() as c:

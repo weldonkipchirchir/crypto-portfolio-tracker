@@ -7,3 +7,5 @@ for filename in ('indicator_library.js','studio_storage.js','chart_panels.js','p
 for filename in ('crypto-portfolio-tracker.html', 'guides/crypto-profit-loss.html', 'guides/wallet-tracking.html', 'about-orbit.html'):
  STATIC_FILES["/"+filename]=(filename,"text/html; charset=utf-8")
 STATIC_FILES.update({"/public_site.css":("public_site.css","text/css; charset=utf-8"),"/robots.txt":("robots.txt","text/plain; charset=utf-8"),"/sitemap.xml":("sitemap.xml","application/xml; charset=utf-8")})
+
+STATIC_FILES.update({"/app.html":("app.html","text/html; charset=utf-8"),"/favicon.svg":("favicon.svg","image/svg+xml"),"/orbit-preview.png":("orbit-preview.png","image/png")})

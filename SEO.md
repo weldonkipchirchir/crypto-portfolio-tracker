@@ -1,11 +1,12 @@
 # Orbit search visibility
 
-Public search landing: https://crypto-portfolio-tracker-rouge.vercel.app/crypto-portfolio-tracker.html
+Public search landing: https://crypto-portfolio-tracker-rouge.vercel.app/
+Private workspace: https://crypto-portfolio-tracker-rouge.vercel.app/app.html
 Sitemap: https://crypto-portfolio-tracker-rouge.vercel.app/sitemap.xml
 
 ## Implemented
 
-Four static public pages: product overview, original weighted-average P&L worked example, wallet tracking guide, and transparent product/data limitations. No login or JavaScript is required to read them. Each has a unique title, description, canonical URL, social metadata, one main heading, semantic navigation and internal links. Public CSS is small and responsive and uses system fonts. Only allowlisted public files enter the CDN build. The existing root workspace remains compatible with saved links and is noindex; the sitemap contains only public content. API routes carry noindex headers on Vercel. Robots allows crawling so search engines can see noindex. Authentication remains the access-control boundary.
+Four static public pages: product overview, original weighted-average P&L worked example, wallet tracking guide, and transparent product/data limitations. No login or JavaScript is required to read them. Each has a unique title, description, canonical URL, social metadata, one main heading, semantic navigation and internal links. Public CSS is small and responsive and uses system fonts. Only allowlisted public files enter the CDN build. The root is the public homepage; the private workspace is now /app.html and is noindex. Existing account sessions continue using the same cookies and APIs. The old product URL and /index.html permanently redirect to the root. The sitemap contains only public content. API routes carry noindex headers on Vercel. Robots allows crawling so search engines can see noindex. Authentication remains the access-control boundary.
 
 No fake reviews, ratings, investment results, public-signup claims or mass-produced coin pages. No software rich-result markup is claimed: Google requires a genuine rating/review and offer information for its software-app rich result, which this owner-restricted product cannot currently substantiate.
 
@@ -27,3 +28,18 @@ No fake reviews, ratings, investment results, public-signup claims or mass-produ
 - Crawling/indexing requests: https://developers.google.com/search/docs/crawling-indexing/ask-google-to-recrawl
 
 Rank is not guaranteed. Indexing can take days or weeks. Search Console access and verified field performance are still needed for an actual search-performance assessment.
+
+## Second audit improvements
+
+- Root-level public homepage, visible app entry point, and permanent duplicate-URL redirects. Canonicals, sitemap, navigation and social URLs consistently prefer the root.
+- WebSite microdata on the root with visible brand Orbit and alternative name Orbit Crypto Portfolio. BreadcrumbList microdata on both guides. Microdata avoids changing the restrictive script CSP. Markup expresses a preference, not a promised search feature.
+- Favicon and real product screenshot for social previews; no invented ratings or endorsements.
+- Public pages use one small local stylesheet, system fonts and no application JavaScript or database requests. The app remains authenticated and noindex at /app.html.
+- API and account data stay outside the sitemap. Unknown routes retain 404 responses.
+- Tests verify canonical paths, redirect configuration, schema presence, internal links, app separation, static build allowlisting and the public CSS size budget.
+
+Additional primary research:
+- Site-name requirements: https://developers.google.com/search/docs/appearance/site-names
+- Canonicalization and redirect signals: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls
+
+No Search Console ownership or field Core Web Vitals data has been provided. These implementation checks are not a Lighthouse score, a rich-results validation, an indexing guarantee or measured ranking improvement.

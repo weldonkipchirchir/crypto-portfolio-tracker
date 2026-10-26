@@ -27,7 +27,7 @@ class SEOTests(unittest.TestCase):
     if tag=='a' and attrs.get('href','').startswith('/'):
      self.assertIn(attrs['href'],STATIC_FILES)
  def test_private_workspace_is_noindex_but_guides_crawlable(self):
-  source=(ROOT/'index.html').read_text(encoding='utf-8')
+  source=(ROOT/'app.html').read_text(encoding='utf-8')
   self.assertIn('content="noindex,follow"',source)
   self.assertIn('/crypto-portfolio-tracker.html',source)
   robots=(ROOT/'robots.txt').read_text()
@@ -37,4 +37,26 @@ class SEOTests(unittest.TestCase):
   average=(2000+10+3000+10)/2
   self.assertEqual(1600-5-average*.5,340)
   self.assertEqual(1.5*3000-average*1.5,735)
+ def test_homepage_and_breadcrumb_schema(self):
+  page=(ROOT/'index.html').read_text(encoding='utf-8')
+  self.assertIn('https://schema.org/WebSite',page)
+  self.assertIn('itemprop="name" content="Orbit"',page)
+  self.assertIn('href="/app.html"',page)
+  self.assertNotIn('id="authForm"',page)
+  for name in ('crypto-profit-loss','wallet-tracking'):
+   guide=(ROOT/('guides/'+name+'.html')).read_text(encoding='utf-8')
+   self.assertIn('https://schema.org/BreadcrumbList',guide)
+   self.assertIn('aria-current="page"',guide)
+ def test_redirects_target_canonical_home(self):
+  import json
+  config=json.loads((ROOT/'vercel.json').read_text())
+  for path in ('/index.html','/crypto-portfolio-tracker.html'):
+   self.assertIn({'source':path,'destination':'/','permanent':True},config['redirects'])
+ def test_public_pages_need_no_application_bundle(self):
+  for name in ('index.html','guides/wallet-tracking.html','guides/crypto-profit-loss.html','about-orbit.html'):
+   source=(ROOT/name).read_text(encoding='utf-8')
+   self.assertNotIn('<script',source)
+   self.assertNotIn('app.js',source)
+   self.assertIn('public_site.css',source)
+  self.assertLess((ROOT/'public_site.css').stat().st_size,6000)
 if __name__=='__main__':unittest.main()
