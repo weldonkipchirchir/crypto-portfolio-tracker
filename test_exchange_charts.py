@@ -16,7 +16,7 @@ class ExchangeTests(unittest.TestCase):
  def test_binance_real_ohlc_and_quote(self):
   rows=[bn((NOW-3600)*1000),bn((NOW-1800)*1000,c='10'),bn((NOW-1800)*1000,c='99'),bn((NOW-1000)*1000,h='5'),bn((NOW+1000)*1000)]
   with patch('providers.request_json',side_effect=[self.meta(),rows]) as req:d=e.chart('bitcoin',1,'candles')
-  self.assertEqual(len(d['candles']),2);self.assertEqual(d['quote_currency'],'USDT');self.assertEqual(d['pair'],'BTCUSDT');self.assertIn('USDT is not USD',d['coverage']);self.assertIn('startTime=',req.call_args.args[0]);self.assertIn('30m',req.call_args.args[0])
+  self.assertEqual(len(d['candles']),2);self.assertEqual(d['quote_currency'],'USDT');self.assertEqual(d['pair'],'BTCUSDT');self.assertEqual(d['candles'][0]['volume'],'1');self.assertIn('USDT is not USD',d['coverage']);self.assertIn('startTime=',req.call_args.args[0]);self.assertIn('30m',req.call_args.args[0])
  def test_binance_all_since_earliest_weekly(self):
   with patch('providers.request_json',side_effect=[self.meta(),[bn(1502928000000),bn((NOW-86400)*1000)]]) as req:d=e.chart('bitcoin','max')
   q=parse_qs(urlsplit(req.call_args.args[0]).query);self.assertEqual(q['startTime'],['0']);self.assertEqual(q['interval'],['1w']);self.assertEqual(d['points'][0]['price'],'11');self.assertTrue(d['complete_request'])
@@ -60,4 +60,50 @@ class ExchangeTests(unittest.TestCase):
   with patch('providers.request_json',side_effect=[self.meta(),rows]):first=e.chart('bitcoin',1)
   with patch('exchange_charts.time.time',return_value=NOW+400),patch('providers.request_json',side_effect=ValueError('bad')):last=e.chart('bitcoin',1)
   self.assertTrue(last['stale']);self.assertEqual(first['fetched_at'],last['fetched_at'])
+class ExplicitIntervalTests(ExchangeTests):
+ def test_explicit_binance_four_hour_and_cache_identity(self):
+  start=NOW//14400*14400-28800
+  with patch('providers.request_json',side_effect=[self.meta(),[bn(start*1000),bn((start+14400)*1000)]]) as req:
+   data=e.chart('bitcoin',7,'candles','binance','4h')
+  self.assertEqual(data['interval_code'],'4h');self.assertEqual(data['interval_seconds'],14400)
+  self.assertIn('interval=4h',req.call_args.args[0]);self.assertEqual(len(data['candles']),2)
+  self.assertIn(('chart','exchange','binance','bitcoin',7,'candles','4h'),m.CACHE)
+  self.assertNotIn(('chart','exchange','binance','bitcoin',7,'candles'),m.CACHE)
+ def test_explicit_invalid_or_too_large_interval(self):
+  for interval in ('2h',True,{},''):
+   with self.assertRaises(ValueError):e.chart('bitcoin',7,'candles','binance',interval)
+  for source in ('coinbase','binance'):
+   m.CACHE.clear();m.FAILURES.clear()
+   with patch('providers.request_json',return_value=self.meta(source)) as req:
+    with self.assertRaisesRegex(ValueError,'shorter range'):e.chart('bitcoin','max','candles',source,'1h')
+   self.assertEqual(req.call_count,0)
+ def test_aggregate_four_hour_exact_ohlc_missing_and_forming(self):
+  start=NOW//14400*14400-43200
+  points=[]
+  for i in range(12):
+   if i==6:continue
+   points.append({'timestamp':(start+i*3600)*1000,'open':str(i+10),'high':str(i+12),'low':str(i+9),'close':str(i+11)})
+  result,omitted=e.aggregate(points,14400,3600,start+11*3600)
+  self.assertEqual(len(result),1);self.assertEqual(omitted,2)
+  self.assertEqual(result[0],{'timestamp':start*1000,'open':'10','high':'15','low':'9','close':'14'})
+ def test_weekly_monday_alignment(self):
+  monday=1792368000 # 2026-10-19 UTC Monday
+  self.assertEqual(e.datetime.datetime.fromtimestamp(monday,e.datetime.timezone.utc).weekday(),0)
+  points=[{'timestamp':(monday+i*86400)*1000,'open':'10','high':'12','low':'9','close':'11'} for i in range(14)]
+  result,omitted=e.aggregate(points,604800,86400,monday+14*86400)
+  self.assertEqual([p['timestamp'] for p in result],[monday*1000,(monday+604800)*1000]);self.assertEqual(omitted,0)
+ def test_coinbase_four_hour_actual_base_interval(self):
+  start=NOW//14400*14400-86400
+  def request(url):
+   if '/candles?' not in url:return self.meta('coinbase')
+   self.assertIn('granularity=3600',url)
+   return [cb(start+i*3600,o=str(i+10),h=str(i+12),l=str(i+9),c=str(i+11)) for i in range(24)]
+  with patch('providers.request_json',side_effect=request):data=e.chart('bitcoin',1,'candles','coinbase','4h')
+  self.assertEqual(data['interval_seconds'],14400);self.assertEqual(len(data['candles']),6)
+  self.assertEqual(data['candles'][0]['close'],'14');self.assertIn('incomplete and still-forming',data['coverage'])
+ def test_explicit_binance_pagination_progress_guard(self):
+  start=NOW//3600*3600-3600
+  with patch('providers.request_json',side_effect=[self.meta(),[bn(start*1000)]*1000,[bn(start*1000)]*1000]):
+   with self.assertRaises(ValueError):e.chart('bitcoin',7,'candles','binance','1h')
+
 if __name__=='__main__':unittest.main()

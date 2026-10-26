@@ -13,6 +13,13 @@ class MarketsAPITests(test_integrations.APITests):
   with self.assertRaises(urllib.error.HTTPError):self.call(self.a,'market-chart',{'coin_id':'bitcoin','source':'bad'})
   with patch('market_news.news',return_value={'articles':[]}):self.assertEqual(self.call(self.a,'market-news',{'coin_id':'bitcoin'})['articles'],[])
   with patch('protocol_data.fundamentals',return_value={'coin_id':'bitcoin'}):self.assertEqual(self.call(self.a,'market-fundamentals',{'coin_id':'bitcoin'})['coin_id'],'bitcoin')
+ def test_explicit_intervals_and_source_validation(self):
+  with patch('exchange_charts.chart',return_value={'interval_code':'4h','candles':[]}) as chart:
+   result=self.call(self.a,'market-chart',{'coin_id':'bitcoin','days':30,'kind':'candles','source':'binance','interval':'4h'})
+   self.assertEqual(result['interval_code'],'4h');chart.assert_called_once_with('bitcoin',30,'candles','binance',interval='4h')
+  with patch('coin_market.chart') as chart:
+   with self.assertRaises(urllib.error.HTTPError) as e:self.call(self.a,'market-chart',{'coin_id':'bitcoin','interval':'1d'})
+   self.assertEqual(e.exception.code,400);chart.assert_not_called()
  def test_shared_cache_and_source_files(self):
   server.market_cache_write(('list',),{'coins':[],'fetched_at':123});self.assertEqual(server.market_cache_read(('list',))['fetched_at'],123)
   for path in ['/market_dashboard.js','/market_dashboard.css']:
