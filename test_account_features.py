@@ -51,6 +51,24 @@ class AccountFeaturesTests(unittest.TestCase):
   permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
   for amount in ['NaN','Infinity','-1','1e99']:
    with patch.object(e,'signed',side_effect=[permissions,{'balances':[{'asset':'BTC','free':amount,'locked':'0'}]}]),self.assertRaises(ValueError):e.snapshot('a','b')
+ def test_exchange_preserves_high_precision_balances_and_values(self):
+  permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
+  account={'balances':[{'asset':'BTC','free':'12345678901234567890.123456789012345678','locked':'0.000000000000000001'}]}
+  quotes={'coins':[{'id':'bitcoin','current_price':'12345.123456789012345678'}]}
+  with patch.object(e,'signed',side_effect=[permissions,account]),patch.object(e.coin_market,'listings',return_value=quotes):
+   row=e.snapshot('a','b')['balances'][0]
+  self.assertEqual(row['quantity'],'12345678901234567890.123456789012345679')
+  from decimal import Decimal,localcontext
+  with localcontext() as ctx:
+   ctx.prec=160
+   self.assertEqual(Decimal(row['value_usd']),Decimal(row['quantity'])*Decimal(quotes['coins'][0]['current_price']))
+ def test_invalid_upstream_shapes_fail_cleanly(self):
+  permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
+  for invalid in (None,[],False,'bad'):
+   with patch.object(e,'signed',return_value=invalid),self.assertRaisesRegex(ValueError,'permission response'):e.snapshot('a','b')
+   with patch.object(e,'signed',side_effect=[permissions,invalid]),self.assertRaisesRegex(ValueError,'balance response'):e.snapshot('a','b')
+  for invalid in ('true',1,None):
+   with patch.object(e,'signed',return_value={**permissions,'enableNewTrading':invalid}),self.assertRaisesRegex(ValueError,'reading-only'):e.snapshot('a','b')
  def test_signed_transport_never_exposes_provider_error(self):
   class Response:
    def __enter__(self):return self

@@ -7,7 +7,8 @@ import providers
 
 def news(coin_id):
  identity=market.allowed(coin_id)
- coin=next((c for c in market.listings()['coins'] if c['id']==identity),None)
+ try:coin=next((c for c in market.listings()['coins'] if c['id']==identity),None)
+ except ValueError:coin=None
  if coin is None:
   import market_intelligence
   coin=market_intelligence.catalog_coin(identity)

@@ -60,6 +60,9 @@ class CloudTests(base.APITests):
  def test_coin_alert_routes_cloud(self):
   import test_upgrades_api
   test_upgrades_api.UpgradeTests.test_coin_alert_routes_are_account_scoped(self)
+ def test_revoked_inflight_trade_cloud(self):
+  import test_upgrades_api
+  test_upgrades_api.UpgradeTests.test_revoked_inflight_trade_cannot_commit(self)
  def setUp(self):
   import psycopg
   from psycopg import sql

@@ -347,6 +347,7 @@ class Handler(BaseHTTPRequestHandler):
      if self.path in ('/api/trade','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove','/api/market-watch-toggle'):
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
      if self.path=='/api/market-watch-toggle':
       result=market_watch.toggle(c,uid,raw,prepared_watch);c.commit();self.send(200,result);return
      if self.path=='/api/target-save':

@@ -87,11 +87,11 @@ el.onchange=e=>{if(e.target.matches('[data-intel-coin]')){state.coin=e.target.va
 
 el.oninput=e=>{if(e.target.matches('[data-intel-search]')){const cursor=e.target.selectionStart;state.query=e.target.value;state.page=1;render();const field=el.querySelector?.('[data-intel-search]');field?.focus();try{field?.setSelectionRange(cursor,cursor)}catch{}}};
 
-const handle={refresh:load};mounted.set(el,handle);load();return handle;
+const handle={refresh:load,syncWatchlist:result=>{stars(result);if(state.tab==='watchlist')state.data=result;render()}};mounted.set(el,handle);load();return handle;
 
 }
 
-window.OrbitIntelligence={mount,depth,money,sentimentHistory};
+window.OrbitIntelligence={mount,syncWatchlist:(container,result)=>mounted.get(container)?.syncWatchlist(result),depth,money,sentimentHistory};
 
 })();
 

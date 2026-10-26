@@ -38,6 +38,7 @@ def fear_greed():
    points[int(stamp)]={'value':int(value),'classification':m.text(raw.get('value_classification'),50),'timestamp':int(stamp)}
   if not points:raise ValueError('No valid sentiment observations')
   history=[points[t] for t in sorted(points,reverse=True)];latest=history[0]
+  if now-latest['timestamp']>2*86400:raise ValueError('Sentiment observation is outdated')
   return {'available':True,'value':latest['value'],'classification':latest['classification'],'observed_at':latest['timestamp'],'history':history,'source':'Alternative.me','source_url':'https://alternative.me/crypto/fear-and-greed-index/','coverage':'Alternative.me Bitcoin-oriented Fear & Greed Index; daily observations, not a whole-market forecast.'}
  return m.cached(('fundamentals','intelligence-fear'),1800,load)
 
@@ -58,7 +59,16 @@ def breadth():
  return m.cached(('fundamentals','intelligence-breadth'),900,load)
 
 def overview():
- return {'fear_greed':safe(fear_greed,'Alternative.me'),'altcoin_breadth':safe(breadth,'CoinGecko'),'alt_season':safe(alt_season,'CoinMarketCap'),'narratives':category_options()}
+ from concurrent.futures import ThreadPoolExecutor
+ from contextlib import nullcontext
+ callbacks=getattr(m.STORE,'callbacks',None);cutoff=getattr(providers._REQUEST_CONTEXT,'cutoff',None) or time.monotonic()+25
+ feeds=(('fear_greed',fear_greed,'Alternative.me'),('altcoin_breadth',breadth,'CoinGecko'),('alt_season',alt_season,'CoinMarketCap'))
+ def observe(feed):
+  key,loader,source=feed
+  with providers.deadline(cutoff), (m.persistence(*callbacks) if callbacks else nullcontext()):return key,safe(loader,source)
+ # Independent providers share the outer request budget, not sequential timeouts.
+ with ThreadPoolExecutor(max_workers=3) as pool:result=dict(pool.map(observe,feeds))
+ return {**result,'narratives':category_options()}
 
 def narratives(slug):
  if not isinstance(slug,str) or slug not in NARRATIVES:raise ValueError('Unsupported narrative')
@@ -129,7 +139,7 @@ def daily_rsi(payload,now=None):
  for i in range(1,len(ordered)):
   if ordered[i]-ordered[i-1]!=86400000:start=i
  ordered=ordered[start:]
- if len(ordered)<15 or now-ordered[-1]/1000>3*86400:raise ValueError('Missing or outdated daily candles')
+ if len(ordered)<15 or ordered[-1]!=(now//86400-1)*86400000:raise ValueError('Missing or outdated daily candles')
  return wilder([points[t] for t in ordered]),ordered[-1]//1000
 
 def rsi():
@@ -160,7 +170,7 @@ def alt_season():
   raw=payload.get('data')
   if not isinstance(raw,dict):raise ValueError('Invalid altcoin season payload')
   value=m.numeric(raw.get('altcoin_index'));stamp=m.stamp(raw.get('snapshot_time'))
-  if value is None or not 0<=Decimal(value)<=100 or stamp is None:raise ValueError('Invalid altcoin season observation')
+  if value is None or not 0<=Decimal(value)<=100 or stamp is None or time.time()-stamp>2*86400:raise ValueError('Invalid altcoin season observation')
   return {'available':True,'value':float(value),'observed_at':stamp,'classification':'Altcoin season' if Decimal(value)>=75 else 'Bitcoin season' if Decimal(value)<=25 else 'Mixed market','window_days':90,'source':'CoinMarketCap','source_url':'https://coinmarketcap.com/charts/altcoin-season-index/','coverage':'CoinMarketCap Altcoin Season Index: top 100 eligible coins compared with Bitcoin over 90 days. Provider exclusions and methodology apply; index >=75 generally signals altcoin season and <=25 Bitcoin season. This is a market indicator, not a forecast.'}
  return m.cached(('fundamentals','intelligence-alt-season'),900,load)
 

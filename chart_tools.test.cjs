@@ -23,4 +23,8 @@ const rows=Array.from({length:100},(_,i)=>({timestamp:1700000000000+i*86400000,o
 let saved=null;const action=async name=>dialog.onclick({target:{closest:()=>({dataset:{ot:name}})}});
 t.open({rows,coinId:'bitcoin',name:'<unsafe>',candles:true,saveSetup:async(k,v)=>{saved=v},loadSetup:async()=>saved});
 assert.ok(dialog.shown);assert.ok(dialog.innerHTML.includes('&lt;unsafe&gt;'));assert.ok(dialog.innerHTML.includes('MACD(12,26,9)'));
-(async()=>{await action('in');assert.ok(dialog.innerHTML.includes('visible 50'));await action('apply');assert.ok(dialog.innerHTML.includes('EMA(10)'));await action('save');assert.ok(saved);await action('reset');await action('load');assert.ok(dialog.innerHTML.includes('visible 50'));await action('close');assert.ok(dialog.closed);console.log('Chart studio rendering, zoom, safe editor and account setup callbacks passed.');})().catch(e=>{console.error(e);process.exitCode=1});
+(async()=>{fields['[data-ot-editor]'].value='EMA(11)';await action('in');assert.ok(dialog.innerHTML.includes('EMA(11)</textarea>'));fields['[data-ot-editor]'].value='EMA(10)';assert.ok(dialog.innerHTML.includes('visible 50'));await action('apply');assert.ok(dialog.innerHTML.includes('EMA(10)'));await action('save');assert.ok(saved);await action('reset');await action('load');assert.ok(dialog.innerHTML.includes('visible 50'));await action('close');assert.ok(dialog.closed);console.log('Chart studio rendering, zoom, safe editor and account setup callbacks passed.');})().catch(e=>{console.error(e);process.exitCode=1});
+
+assert.deepEqual(t.normalize([null,{timestamp:null,close:4},{timestamp:'',close:4},{timestamp:Infinity,close:3}]),[]);
+const malformed=t.normalize([{timestamp:1,close:4,open:3,low:5,high:2}])[0];assert.equal(malformed.high,undefined);assert.equal(malformed.low,undefined);assert.equal(malformed.close,4);
+assert.deepEqual(t.normalize({not:'an array'}),[]);

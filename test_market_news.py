@@ -27,6 +27,10 @@ class NewsTests(unittest.TestCase):
   payload={'articles':[{'title':'Bitcoin blockchain news','url':'https://example.com/new','domain':'example.com','seendate':datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ'),'content':'never copy this'}]}
   with patch.dict(os.environ,{'NEWS_API_KEY':''}),patch('providers.request_json',return_value=payload):d=n.news('bitcoin')
   self.assertTrue(d['available']);self.assertEqual(d['source'],'GDELT');self.assertEqual(len(d['articles']),1);self.assertNotIn('content',d['articles'][0])
+ def test_category_identity_news_survives_rankings_outage(self):
+  import market_intelligence
+  with patch('coin_market.listings',side_effect=ValueError('provider outage')),patch.object(market_intelligence,'catalog_coin',return_value={'id':'bitcoin','name':'Bitcoin'}),patch.dict(os.environ,{'NEWS_API_KEY':''}),patch('providers.request_json',return_value={'articles':[]}):d=n.news('bitcoin')
+  self.assertTrue(d['available']);self.assertEqual(d['coin_id'],'bitcoin')
  def test_provider_errors_and_bounds(self):
   for payload in [{'status':'error','message':'secret'},{'status':'ok','articles':[{}]*101},{'status':'ok','articles':{}}]:
    m.CACHE.clear();m.FAILURES.clear()

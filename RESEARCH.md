@@ -56,3 +56,9 @@ Research latency: unrelated market operations no longer share a network-duration
 News defaults to GDELT public index headline metadata and external publisher links, with a visible search fallback on rate limits/outages. No article bodies or images are copied. Local live GDELT checks returned rate limits; availability depends on the public service. A production-licensed NewsAPI configuration remains optional.
 
 Methodology: Binance API restrictions https://developers.binance.com/en/docs/catalog/core-trading-wallet/api/rest-api/account ; TradingView EMA https://www.tradingview.com/support/solutions/43000592270-exponential-moving-average/ ; MACD https://www.tradingview.com/support/solutions/43000502344-moving-average-convergence-divergence-macd-indicator/ ; GDELT https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/ .
+
+## Recheck: reliability and data freshness
+
+A second review fixed alert form replacement during unrelated chart refreshes, delayed watchlist-state races, unfinished indicator drafts disappearing on chart actions, and overlapping setup save/load operations. Watchlist actions now wait for confirmed account state and offer a retry on failure. Tiny coin holdings retain significant digits instead of being displayed as zero. Exchange parsing preserves complete supported decimal precision and rejects malformed permission/account objects and unexpected nonboolean permission flags.
+
+Independent sentiment feeds now run concurrently with the same request deadline and persistent-cache context. A live cold check returned all three feeds in 1.06 seconds. Outdated daily sentiment/index observations and missing latest completed UTC RSI candles are rejected. News for validated category coins survives a rankings-provider outage. Legacy trade mutations now recheck the session after acquiring the account write lock, preventing an in-flight request from committing after session revocation; this scenario is tested on SQLite and PostgreSQL.

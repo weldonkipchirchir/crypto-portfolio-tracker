@@ -38,3 +38,25 @@ class UpgradeTests(base.APITests):
   for chains in [[{}],[['Ethereum']]]:
    with self.assertRaises(urllib.error.HTTPError) as e:self.call(self.a,'wallet-batch',{'chains':chains,'address':'0x'+'a'*40,'label':'Invalid'})
    self.assertEqual(e.exception.code,400)
+
+ def test_revoked_inflight_trade_cannot_commit(self):
+  import threading,server
+  from concurrent.futures import ThreadPoolExecutor
+  entered=threading.Event();original=server.Handler.user
+  def observed(handler,c):
+   uid=original(handler,c)
+   if handler.path=='/api/trade':entered.set()
+   return uid
+  def submit():
+   try:self.call(self.a,'trade',{'date':'2026-01-01','symbol':'BTC','side':'buy','quantity':1,'price':100});return 200
+   except urllib.error.HTTPError as e:return e.code
+  with server.connect() as c,patch.object(server.Handler,'user',observed):
+   uid=c.execute('SELECT id FROM users WHERE email=?',('a@test.com',)).fetchone()['id']
+   if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+   else:c.execute('BEGIN IMMEDIATE')
+   with ThreadPoolExecutor(max_workers=1) as pool:
+    pending=pool.submit(submit)
+    try:self.assertTrue(entered.wait(3));c.execute('DELETE FROM sessions WHERE user_id=?',(uid,))
+    finally:c.commit()
+    self.assertEqual(pending.result(timeout=5),401)
+   self.assertEqual(c.execute('SELECT COUNT(*) AS n FROM trades WHERE user_id=?',(uid,)).fetchone()['n'],0)

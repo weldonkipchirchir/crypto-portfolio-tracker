@@ -1,7 +1,7 @@
 """Encrypted, read-only Binance spot snapshots. Never places orders or transfers."""
 import base64,hashlib,hmac,json,os,re,secrets,time,urllib.request,urllib.error
 from urllib.parse import urlencode
-from decimal import Decimal,InvalidOperation
+from decimal import Decimal,InvalidOperation,localcontext
 import providers
 import exchange_charts
 import coin_market
@@ -57,10 +57,13 @@ def snapshot(key,secret):
  permissions=signed(PATHS[0],key,secret)
  # Official Binance apiRestrictions schema lists these flags. Omission is not
  # proof that a potentially dangerous permission is disabled. Fail closed.
+ if not isinstance(permissions,dict):raise ValueError('Invalid Binance permission response')
  if permissions.get('enableReading') is not True:raise ValueError('Enable Reading on this Binance API key')
  if any(x not in permissions or type(permissions[x]) is not bool for x in PERMISSIONS):raise ValueError('Binance did not provide all permission flags. This key cannot be verified as read-only; reconnect a standard Binance HMAC key.')
- if any(permissions[x] for x in PERMISSIONS) or any(v is True and k.startswith(('enable','permits')) and k not in ('enableReading','enableFixReadOnly') for k,v in permissions.items()):raise ValueError('Use a reading-only key. Disable trading, withdrawals, margin, futures, options and transfers.')
- account=signed(PATHS[1],key,secret);rows=account.get('balances')
+ if any(permissions[x] for x in PERMISSIONS) or any((type(v) is not bool or v is True) and k.startswith(('enable','permits')) and k not in ('enableReading','enableFixReadOnly') for k,v in permissions.items()):raise ValueError('Use a reading-only key. Disable trading, withdrawals, margin, futures, options and transfers.')
+ account=signed(PATHS[1],key,secret)
+ if not isinstance(account,dict):raise ValueError('Invalid Binance balance response')
+ rows=account.get('balances')
  if not isinstance(rows,list) or len(rows)>5000:raise ValueError('Invalid Binance balance response')
  balances=[];seen=set()
  for row in rows:
@@ -71,7 +74,12 @@ def snapshot(key,secret):
    if not isinstance(asset,str) or not re.fullmatch(r'[A-Z0-9]{1,30}',asset) or not all(n.is_finite() and n>=0 and n.adjusted()<=30 and n.as_tuple().exponent>=-30 for n in (free,locked)):raise ValueError()
    if asset in seen:raise ValueError()
    seen.add(asset)
-   if free+locked:balances.append({'asset':asset,'free':str(free),'locked':str(locked),'quantity':str(free+locked)})
+   # Keep every accepted digit: Decimal's default 28-digit context can
+   # silently round even ordinary tokens with large supplies and 18 decimals.
+   with localcontext() as context:
+    context.prec=128
+    quantity=free+locked
+   if quantity:balances.append({'asset':asset,'free':str(free),'locked':str(locked),'quantity':str(quantity)})
   except (ValueError,KeyError,TypeError,InvalidOperation):raise ValueError('Invalid Binance balance response') from None
  # Curated exchange asset IDs only. Unknown symbols remain explicitly unpriced.
  identities={symbol:identity for identity,symbol in exchange_charts.ASSETS.items()};identities.update(USDC='usd-coin',USDT='tether',BNB='binancecoin')
@@ -80,7 +88,9 @@ def snapshot(key,secret):
  for row in balances:
   identity=identities.get(row['asset']);quote=quotes.get(identity,{})
   row['coin_id']=identity;row['price_usd']=quote.get('current_price');row['change_24h_pct']=quote.get('price_change_percentage_24h');row['price_updated_at']=quote.get('last_updated')
-  row['value_usd']=str(Decimal(row['quantity'])*Decimal(str(row['price_usd']))) if row['price_usd'] is not None else None
+  with localcontext() as context:
+   context.prec=160
+   row['value_usd']=str(Decimal(row['quantity'])*Decimal(str(row['price_usd']))) if row['price_usd'] is not None else None
  return {'balances':balances,'updated_at':int(time.time()),'coverage':'Binance Spot free + locked balances only. Earn, futures, margin and historical cost basis are not included. Manual refresh.','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
 
 def state(c,uid):

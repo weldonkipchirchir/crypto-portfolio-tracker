@@ -36,6 +36,23 @@ class IntelligenceTests(unittest.TestCase):
  def test_overview_failure_independent_sources(self):
   with patch.object(mi,'fear_greed',side_effect=ValueError()),patch.object(mi,'breadth',return_value={'available':True}),patch.object(mi,'alt_season',return_value={'value':51}):r=mi.overview()
   self.assertFalse(r['fear_greed']['available']);self.assertEqual(r['alt_season']['value'],51)
+ def test_overview_parallel_with_deadline_and_persistence(self):
+  import threading
+  gate=threading.Barrier(3);cutoff=time.monotonic()+20;callbacks=(lambda k:None,lambda *a:None)
+  def load():
+   self.assertEqual(mi.providers._REQUEST_CONTEXT.cutoff,cutoff)
+   self.assertEqual(m.STORE.callbacks,callbacks)
+   gate.wait(timeout=2)
+   return {'available':True}
+  with mi.providers.deadline(cutoff),m.persistence(*callbacks),patch.object(mi,'fear_greed',side_effect=load),patch.object(mi,'breadth',side_effect=load),patch.object(mi,'alt_season',side_effect=load):r=mi.overview()
+  self.assertTrue(all(r[k]['available'] for k in ('fear_greed','altcoin_breadth','alt_season')))
+ def test_sentiment_outdated_observation_not_current(self):
+  data={'data':[{'value':'25','timestamp':str(int(time.time())-3*86400)}]}
+  with patch.object(mi.providers,'request_json',return_value=data):
+   with self.assertRaises(ValueError):mi.fear_greed()
+ def test_rsi_missing_latest_completed_day_not_current(self):
+  payload,now=self.candles();payload['candles']=payload['candles'][:-2]
+  with self.assertRaises(ValueError):mi.daily_rsi(payload,now)
  def test_narrative_fixed_allowlist_and_dedup(self):
   with self.assertRaises(ValueError):mi.narratives('../x')
   with patch.object(m,'request',return_value=[self.row('ondo-finance'),self.row('ondo-finance'),{'id':'bad'}]) as req:r=mi.narratives('rwa')
