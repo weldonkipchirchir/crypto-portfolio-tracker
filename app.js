@@ -9,9 +9,26 @@ let providerRequestTail=Promise.resolve();
 
 async function api(path,data){if(path.startsWith('market-')||path.startsWith('intelligence-'))return rawApi(path,data);if(['sync','refresh-prices','history','wallet-details','discover-tokens','market-listings','market-detail','market-chart','market-fundamentals','market-news','intelligence-overview','intelligence-narrative','intelligence-rsi','intelligence-venues','intelligence-flow','intelligence-derivatives','intelligence-exposures','market-watch-toggle','market-watchlist'].includes(path)){const pending=providerRequestTail.then(()=>rawApi(path,data));providerRequestTail=pending.catch(()=>{});return pending}return rawApi(path,data)}
 
-async function rawApi(path,data){const r=await fetch('/api/'+path,{method:data?'POST':'GET',headers:{'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});const j=await r.json();if(!r.ok){const e=Error(j.error||'Request failed');e.status=r.status;throw e;}return j}
+async function rawApi(path,data){const r=await fetch('/api/'+path,{credentials:'same-origin',cache:'no-store',method:data?'POST':'GET',headers:{'Content-Type':'application/json'},body:data?JSON.stringify(data):undefined});const j=await r.json();if(!r.ok){const e=Error(j.error||'Request failed');e.status=r.status;throw e;}return j}
 
-async function load(){try{state=await api('state');$('auth').classList.add('hidden');document.querySelector('aside').inert=false;document.querySelector('main').inert=false;document.title='Orbit | Crypto Portfolio Workspace';$('email').textContent=state.profile?.name||state.email;render();if(!initialWalletSync&&state.wallets.some(w=>!w.snapshot)){initialWalletSync=true;await refresh($('syncWallets'),'sync')}queueMissingHistory()}catch(e){if(e.status===401)$('auth').classList.remove('hidden');else toast('Could not load portfolio: '+e.message)}}
+async function restoreSession(fetchState,view){
+ view.loading();
+ try{const next=await fetchState();view.ready(next);return next}
+ catch(e){if(e.status===401)view.unauthorized();else view.unavailable(e);return null}
+}
+let sessionReady=false;
+async function load(){
+ const first=!sessionReady;
+ const next=await restoreSession(()=>api('state'),{
+  loading(){if(first){$('auth').classList.add('hidden');$('sessionRestore').classList.remove('hidden');$('sessionRestoreMessage').textContent='Checking your saved session…';$('sessionRetry').classList.add('hidden')}},
+  ready(next){state=next;sessionReady=true;$('auth').classList.add('hidden');$('sessionRestore').classList.add('hidden');document.querySelector('aside').inert=false;document.querySelector('main').inert=false;document.title='Orbit | Crypto Portfolio Workspace'},
+  unauthorized(){sessionReady=false;$('sessionRestore').classList.add('hidden');$('auth').classList.remove('hidden');document.querySelector('aside').inert=true;document.querySelector('main').inert=true;document.title='Sign in | Orbit Crypto Portfolio Workspace'},
+  unavailable(e){if(first){$('sessionRestoreMessage').textContent='Could not reconnect to your workspace. Your session has not been cleared. Please try again.';$('sessionRetry').classList.remove('hidden')}else toast('Could not load portfolio: '+e.message)}
+ });
+ if(!next)return;
+ try{$('email').textContent=state.profile?.name||state.email;render();if(!initialWalletSync&&state.wallets.some(w=>!w.snapshot)){initialWalletSync=true;await refresh($('syncWallets'),'sync')}queueMissingHistory()}catch(e){toast('Could not load portfolio: '+e.message)}
+}
+$('sessionRetry').onclick=()=>load();
 
 function pnl(n){return '<span class="'+(n>=0?'positive':'negative')+'">'+money(n)+'</span>'}
 
