@@ -73,6 +73,11 @@ class AccountFeaturesTests(unittest.TestCase):
    self.assertEqual(e.earn_positions('key','secret')['BNB'],__import__('decimal').Decimal('10.2'));self.assertEqual(signed.call_count,2)
   for response in [{'rows':rows[:1]*2,'total':2},{'rows':[],'total':301},{'rows':[],'total':1}]:
    with patch.object(e,'signed',return_value=response),self.assertRaises(ValueError):e.earn_positions('key','secret')
+ def test_exchange_repricing_never_decrypts_or_changes_balance(self):
+  snapshot={'balances':[{'asset':'LDBNB','quantity':'1','display_quantity':'1.25','valuation_basis':'verified_earn_underlying','coin_id':'binancecoin','value_usd':'100'},{'asset':'LDUSDT','quantity':'2','valuation_basis':'earn_balance_unverified','coin_id':'tether','value_usd':None}],'updated_at':123}
+  self.c.execute('INSERT INTO exchange_connections VALUES (?,?,?,?,?)',(1,'reprice','fixture','encrypted-placeholder',json.dumps(snapshot)))
+  with patch.object(e,'crypt',side_effect=AssertionError('must not decrypt')),patch.object(e,'signed',side_effect=AssertionError('must not call Binance')),patch.object(e.coin_market,'listings',return_value={'coins':[{'id':'binancecoin','current_price':600,'last_updated':456},{'id':'tether','current_price':1}]}):updates=e.reprice_snapshots(self.c,1)
+  result=json.loads(updates[0][0]);self.assertEqual(result['updated_at'],123);self.assertEqual(result['balances'][0]['quantity'],'1');self.assertEqual(result['balances'][0]['value_usd'],'750.00');self.assertEqual(result['balances'][0]['price_updated_at'],456);self.assertIsNone(result['balances'][1]['value_usd']);self.assertEqual(e.reprice_snapshots(self.c,2),[])
  def test_binance_safe_diagnostic_codes(self):
   permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
   for rows,code in [(None,'BALANCE_LIST'),([False],'BALANCE_ROW'),([{'asset':'BTC','free':'NaN','locked':'0'}],'BALANCE_AMOUNT'),([{'asset':'BTC','free':'1','locked':'0'}]*2,'BALANCE_DUPLICATE')]:

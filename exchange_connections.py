@@ -178,7 +178,29 @@ def snapshot(key,secret):
    context.prec=160
    price=row['price_usd']
    row['value_usd']=str(amount*Decimal(str(price))) if amount is not None and isinstance(price,(str,int,float)) and not isinstance(price,bool) and Decimal(str(price)).is_finite() and Decimal(str(price))>=0 else None
- return {'balances':balances,'updated_at':int(time.time()),'coverage':'Spot balances plus matched Simple Earn Flexible positions. LD identifiers are retained; displayed Earn amounts use verified underlying totalAmount. Futures, margin, other Earn products and historical cost basis are not included. Manual refresh.','earn_status':'unavailable' if earn_error else 'partial' if any(r['valuation_basis']=='earn_balance_unverified' for r in balances) else 'checked' if earn else 'none','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
+ return {'account_key':hashlib.sha256(('binance:'+str(account['uid'])).encode()).hexdigest() if isinstance(account.get('uid'),(str,int)) and not isinstance(account.get('uid'),bool) and re.fullmatch(r'[0-9]{1,40}',str(account['uid'])) else None,'balances':balances,'updated_at':int(time.time()),'coverage':'Spot balances plus matched Simple Earn Flexible positions. LD identifiers are retained; displayed Earn amounts use verified underlying totalAmount. Futures, margin, other Earn products and historical cost basis are not included. Manual refresh.','earn_status':'unavailable' if earn_error else 'partial' if any(r['valuation_basis']=='earn_balance_unverified' for r in balances) else 'checked' if earn else 'none','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
+
+def reprice_snapshots(c,uid):
+ """Refresh saved valuation only. Does not decrypt keys or sync balances."""
+ saved=list(c.execute('SELECT id,snapshot FROM exchange_connections WHERE user_id=?',(uid,)))
+ if not saved:return []
+ try:
+  market=coin_market.listings();quotes={r['id']:r for r in market['coins']}
+ except ValueError:market={'stale':True};quotes={}
+ updates=[]
+ for record in saved:
+  snapshot=json.loads(record['snapshot'])
+  for row in snapshot.get('balances',[]):
+   quote=quotes.get(row.get('coin_id'),{});price=coin_market.numeric(quote.get('current_price'))
+   amount=row.get('display_quantity') if row.get('valuation_basis')=='verified_earn_underlying' else row.get('quantity') if display_asset(row.get('asset'))==row.get('asset') else None
+   amount=coin_market.numeric(amount)
+   if price is None or amount is None:row['price_stale']=True;continue
+   row.update(price_usd=price,price_updated_at=quote.get('last_updated'),change_24h_pct=quote.get('price_change_percentage_24h'),price_stale=bool(market.get('stale')))
+   with localcontext() as ctx:
+    ctx.prec=160;row['value_usd']=str(Decimal(price)*Decimal(amount))
+  snapshot['prices_checked_at']=int(time.time())
+  updates.append((json.dumps(snapshot),uid,record['id']))
+ return updates
 
 def display_snapshot(snapshot):
  for row in snapshot.get('balances',[]):

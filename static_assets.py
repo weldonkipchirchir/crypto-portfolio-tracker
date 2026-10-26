@@ -19,3 +19,5 @@ STATIC_FILES.update({"/guides/import-crypto-trades-csv.html":("guides/import-cry
 STATIC_FILES["/workspace_polish.css"]=("workspace_polish.css","text/css; charset=utf-8")
 
 STATIC_FILES["/combo_dashboard.js"]=("combo_dashboard.js","text/javascript; charset=utf-8")
+
+STATIC_FILES["/portfolio_overview.js"]=("portfolio_overview.js","text/javascript; charset=utf-8")

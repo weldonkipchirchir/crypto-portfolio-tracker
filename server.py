@@ -444,11 +444,14 @@ class Handler(BaseHTTPRequestHandler):
       symbols+= [v[0] for v in providers.CHAINS.values()]
       quotes=providers.market_prices(symbols)
       if not quotes: raise ValueError('No price quotes returned. Please retry later.')
+      with coin_market.persistence(market_cache_read,market_cache_write):exchange_updates=exchange_connections.reprice_snapshots(c,uid)
       token_updates=[]
       for row in c.execute('SELECT t.wallet_id,t.data,w.chain FROM wallet_tokens t JOIN wallets w ON w.id=t.wallet_id WHERE w.user_id=?',(uid,)):
        updated=token_pricing.enrich(row['chain'],json.loads(row['data']));token_updates.append((row['wallet_id'],json.dumps(updated)))
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      for data,owner,identity in exchange_updates:c.execute('UPDATE exchange_connections SET snapshot=? WHERE user_id=? AND id=?',(data,owner,identity))
       for wallet_id,data in token_updates:c.execute('INSERT OR REPLACE INTO wallet_tokens VALUES (?,?)',(wallet_id,data))
       for symbol,quote in quotes.items():
        c.execute('INSERT OR REPLACE INTO prices VALUES (?,?,?)',(uid,symbol,quote['price']))

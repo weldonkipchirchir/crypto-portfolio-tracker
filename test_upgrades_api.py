@@ -37,6 +37,15 @@ class UpgradeTests(base.APITests):
    with self.assertRaises(urllib.error.HTTPError):self.call(self.b,'exchange-sync',{'id':identity})
    refreshed=self.call(self.a,'exchange-sync',{'id':identity});self.assertEqual(len(refreshed['connections']),1)
    self.call(self.a,'exchange-delete',{'id':identity});self.assertEqual(self.call(self.a,'state')['exchanges'],[])
+ def test_price_refresh_revalues_exchange_without_resync(self):
+  import server,json
+  snapshot={'balances':[{'asset':'LDBNB','display_quantity':'1.25','quantity':'1','coin_id':'binancecoin','valuation_basis':'verified_earn_underlying','value_usd':'100'}],'updated_at':123}
+  with server.connect() as c:
+   uid=c.execute('SELECT id FROM users WHERE email=?',('a@test.com',)).fetchone()['id']
+   c.execute('INSERT INTO exchange_connections VALUES (?,?,?,?,?)',(uid,'reprice-fixture','Binance','encrypted-placeholder',json.dumps(snapshot)));c.commit()
+  with patch('providers.market_prices',return_value={'BTC':{'price':'50000','source':'fixture','updated_at':456}}),patch('coin_market.listings',return_value={'coins':[{'id':'binancecoin','current_price':600,'last_updated':456}]}),patch('exchange_connections.crypt',side_effect=AssertionError('must not decrypt')),patch('exchange_connections.signed',side_effect=AssertionError('must not resync')):
+   self.call(self.a,'refresh-prices',{})
+  saved=self.call(self.a,'state')['exchanges'][0]['snapshot'];self.assertEqual(saved['balances'][0]['value_usd'],'750.00');self.assertEqual(saved['balances'][0]['quantity'],'1');self.assertEqual(saved['updated_at'],123);self.assertEqual(self.call(self.b,'state')['exchanges'],[])
  def test_exchange_state_no_secret(self):
   result=self.call(self.a,'exchange-state',{});self.assertEqual(result['connections'],[]);self.assertNotIn('credentials',str(result))
 
