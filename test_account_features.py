@@ -157,4 +157,25 @@ class AccountFeaturesTests(unittest.TestCase):
    self.assertEqual(e.state(self.c,2)['connections'],[])
    e.delete(self.c,2,{'id':result['connections'][0]['id']});self.assertEqual(len(e.state(self.c,1)['connections']),1)
 
+
+ def test_earn_without_ld_receipts_and_locked_positions(self):
+  permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
+  account={'balances':[{'asset':'BNB','free':'0.5','locked':'0'}]}
+  flexible={'total':1,'rows':[{'asset':'BNB','productId':'BNB001','totalAmount':'1.25'}]}
+  locked={'total':2,'rows':[{'asset':'BNB','positionId':123,'amount':'2'},{'asset':'BNB','positionId':124,'amount':'3'}]}
+  quotes={'coins':[{'id':'binancecoin','current_price':600}]}
+  with patch.object(e,'signed',side_effect=[permissions,account,flexible,locked]),patch.object(e.coin_market,'listings',return_value=quotes):result=e.snapshot('key','secret')
+  rows=result['balances'];self.assertEqual(len(rows),3)
+  self.assertEqual([r['display_quantity'] for r in rows],['0.5','1.25','5'])
+  self.assertEqual(sum(__import__('decimal').Decimal(r['value_usd']) for r in rows),4050)
+  self.assertEqual(rows[1]['account_type'],'Earn');self.assertEqual(rows[2]['earn_kind'],'Locked')
+  self.assertEqual(result['locked_earn_status'],'checked');self.assertEqual(result['alpha_status'],'unsupported')
+ def test_unknown_ld_symbol_matches_verified_earn_without_duplicate(self):
+  permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
+  account={'balances':[{'asset':'LDNEWCOIN','free':'1','locked':'0'}]}
+  flexible={'total':1,'rows':[{'asset':'NEWCOIN','productId':'NEW001','totalAmount':'123.45'}]}
+  with patch.object(e,'signed',side_effect=[permissions,account,flexible,{'total':0,'rows':[]}]),patch.object(e.coin_market,'listings',return_value={'coins':[]}):result=e.snapshot('key','secret')
+  self.assertEqual(len(result['balances']),1);row=result['balances'][0]
+  self.assertEqual(row['display_asset'],'NEWCOIN');self.assertEqual(row['display_quantity'],'123.45');self.assertIsNone(row['value_usd'])
+
 if __name__=='__main__':unittest.main()

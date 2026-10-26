@@ -6,4 +6,4 @@ const cal=p.calendar(2024,[{date:'2024-02-29',realized:100,sales:1},{date:'2024-
 
 const unknownEarn=p.positions({exchanges:[{id:'x',snapshot:{balances:[{asset:'LDBNB',display_asset:'BNB',quantity:'1',account_type:'Earn',valuation_basis:'earn_balance_unverified'}]}}]});assert.equal(unknownEarn[0].quantity,null);
 
-const filtered=p.visiblePositions([{source:'exchange',symbol:'DUST',label:'A',value:'.1'},{source:'exchange',symbol:'UNKNOWN',label:'A',value:null},{source:'ledger',symbol:'BTC',label:'Recorded',value:200}], 'connected','',true);assert.equal(filtered.length,1);assert.equal(filtered[0].symbol,'UNKNOWN');
+const filtered=p.visiblePositions([{source:'exchange',symbol:'DUST',label:'A',value:'.1'},{source:'exchange',symbol:'UNKNOWN',label:'A',value:null},{source:'ledger',symbol:'BTC',label:'Recorded',value:200}], 'connected','',true);assert.equal(filtered.length,0);assert.equal(p.visiblePositions([{source:'exchange',symbol:'BNB',label:'Earn',value:750}], 'connected').length,1);

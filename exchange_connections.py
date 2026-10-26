@@ -6,7 +6,7 @@ import providers
 import exchange_charts
 import coin_market
 PERMISSIONS=('enableWithdrawals','enableInternalTransfer','enableMargin','enableFutures','permitsUniversalTransfer','enableVanillaOptions','enableFixApiTrade','enableSpotAndMarginTrading','enablePortfolioMarginTrading')
-PATHS=('/sapi/v1/account/apiRestrictions','/api/v3/account','/sapi/v1/simple-earn/flexible/position')
+PATHS=('/sapi/v1/account/apiRestrictions','/api/v3/account','/sapi/v1/simple-earn/flexible/position','/sapi/v1/simple-earn/locked/position')
 EARN_SYMBOLS=set('BNB BTC USDT ETH LINK XRP XLM USDC UNI ALGO FET SOL HBAR AAVE AVAX CELR NEAR RAY QNT INJ GMX FLUX SUI PENDLE SEI ENA TAO G RENDER POL BNSOL ONDO 0G'.split())
 
 def init(c):
@@ -76,7 +76,7 @@ def signed(path,key,secret,*,page=1):
  if path not in PATHS:raise ValueError('Unsupported exchange operation')
  params={'timestamp':int(time.time()*1000),'recvWindow':5000}
  if path==PATHS[1]:params['omitZeroBalances']='true'
- if path==PATHS[2]:
+ if path in PATHS[2:]:
   if type(page) is not int or not 1<=page<=3:raise ValueError('Invalid Earn position page')
   params.update(current=page,size=100)
  query=urlencode(params)
@@ -98,15 +98,15 @@ def validate_credentials(raw):
  if not all(isinstance(x,str) and re.fullmatch(r'[A-Za-z0-9]{32,128}',x) for x in (key,secret)):raise ValueError('Enter a Binance HMAC API key and secret')
  return key,secret
 
-def earn_positions(key,secret):
+def earn_positions(key,secret,locked=False):
  totals={};seen=set();received=0
  for page in range(1,4):
-  result=signed(PATHS[2],key,secret,page=page)
+  result=signed(PATHS[3] if locked else PATHS[2],key,secret,page=page)
   rows=result.get('rows');total=result.get('total')
   if not isinstance(rows,list) or len(rows)>100 or type(total) is not int or not 0<=total<=300:raise ValueError('Earn position response unavailable')
   for row in rows:
    if not isinstance(row,dict):raise ValueError('Earn position response unavailable')
-   asset=row.get('asset');product=row.get('productId');amount=row.get('totalAmount')
+   asset=row.get('asset');position=row.get('positionId');product=str(position) if locked and type(position) in (str,int) else None if locked else row.get('productId');amount=row.get('amount') if locked else row.get('totalAmount')
    if not isinstance(asset,str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}',asset) or not isinstance(product,str) or not 1<=len(product)<=100 or product in seen or not isinstance(amount,str) or len(amount)>80:raise ValueError('Earn position response unavailable')
    seen.add(product)
    try:value=Decimal(amount)
@@ -163,13 +163,26 @@ def snapshot(key,secret):
  identities={symbol:identity for identity,symbol in exchange_charts.ASSETS.items()};identities.update(USDC='usd-coin',USDT='tether',BNB='binancecoin',ALGO='algorand',FET='fetch-ai',HBAR='hedera-hashgraph',CELR='celer-network',RAY='raydium',QNT='quant-network',INJ='injective-protocol',GMX='gmx',FLUX='zelcash',PENDLE='pendle',SEI='sei-network',ENA='ethena',TAO='bittensor',RENDER='render-token',POL='polygon-ecosystem-token',BNSOL='binance-staked-sol',ONDO='ondo-finance')
  try:quotes={r['id']:r for r in coin_market.listings()['coins']}
  except ValueError:quotes={}
- earn={};earn_error=False
- if any(display_asset(r['asset'])!=r['asset'] for r in balances):
-  try:earn=earn_positions(key,secret)
-  except Exception:earn_error=True
+ earn={};locked_earn={};earn_error=False;locked_error=False
+ try:earn=earn_positions(key,secret)
+ except Exception:earn_error=True
+ try:locked_earn=earn_positions(key,secret,locked=True)
+ except Exception:locked_error=True
+ # LD balances are receipts, not additional underlying coins. Match by the
+ # verified Earn asset identity, including symbols outside the display catalog.
+ matched=set()
  for row in balances:
-  symbol=display_asset(row['asset']);wrapped=symbol!=row['asset'];row['display_asset']=symbol;row['account_type']='Earn' if wrapped else 'Spot'
-  amount=earn.get(symbol) if wrapped else Decimal(row['quantity'])
+  raw=row['asset']
+  if raw.startswith('LD') and raw[2:] in earn:
+   row['display_asset']=raw[2:];matched.add(raw[2:])
+ for symbol,amount in earn.items():
+  if amount>0 and symbol not in matched:
+   balances.append({'asset':'EARN_FLEX:'+symbol,'display_asset':symbol,'free':'0','locked':'0','quantity':str(amount),'earn_kind':'Flexible'})
+ for symbol,amount in locked_earn.items():
+  if amount>0:balances.append({'asset':'EARN_LOCKED:'+symbol,'display_asset':symbol,'free':'0','locked':'0','quantity':str(amount),'earn_kind':'Locked'})
+ for row in balances:
+  symbol=row.get('display_asset',display_asset(row['asset']));wrapped=symbol!=row['asset'];row['display_asset']=symbol;row['account_type']='Earn' if wrapped else 'Spot'
+  amount=(locked_earn if row.get('earn_kind')=='Locked' else earn).get(symbol) if wrapped else Decimal(row['quantity'])
   row['display_quantity']=format(amount if amount is not None else Decimal(row['quantity']),'f')
   row['valuation_basis']='verified_earn_underlying' if wrapped and amount is not None else 'earn_balance_unverified' if wrapped else 'spot_balance'
   identity=identities.get(symbol);quote=quotes.get(identity,{})
@@ -178,7 +191,7 @@ def snapshot(key,secret):
    context.prec=160
    price=row['price_usd']
    row['value_usd']=str(amount*Decimal(str(price))) if amount is not None and isinstance(price,(str,int,float)) and not isinstance(price,bool) and Decimal(str(price)).is_finite() and Decimal(str(price))>=0 else None
- return {'account_key':hashlib.sha256(('binance:'+str(account['uid'])).encode()).hexdigest() if isinstance(account.get('uid'),(str,int)) and not isinstance(account.get('uid'),bool) and re.fullmatch(r'[0-9]{1,40}',str(account['uid'])) else None,'balances':balances,'updated_at':int(time.time()),'coverage':'Spot balances plus matched Simple Earn Flexible positions. LD identifiers are retained; displayed Earn amounts use verified underlying totalAmount. Futures, margin, other Earn products and historical cost basis are not included. Manual refresh.','earn_status':'unavailable' if earn_error else 'partial' if any(r['valuation_basis']=='earn_balance_unverified' for r in balances) else 'checked' if earn else 'none','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
+ return {'account_key':hashlib.sha256(('binance:'+str(account['uid'])).encode()).hexdigest() if isinstance(account.get('uid'),(str,int)) and not isinstance(account.get('uid'),bool) and re.fullmatch(r'[0-9]{1,40}',str(account['uid'])) else None,'balances':balances,'updated_at':int(time.time()),'coverage':'Spot plus verified Simple Earn Flexible and Locked positions. Receipt balances are not counted twice. Alpha account holdings, other Earn products, futures, margin and historical cost basis are not imported. Manual refresh.','alpha_status':'unsupported','locked_earn_status':'unavailable' if locked_error else 'checked','earn_status':'unavailable' if earn_error else 'partial' if any(r['valuation_basis']=='earn_balance_unverified' for r in balances) else 'checked' if earn else 'none','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
 
 def reprice_snapshots(c,uid):
  """Refresh saved valuation only. Does not decrypt keys or sync balances."""
