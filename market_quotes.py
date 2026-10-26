@@ -21,11 +21,12 @@ def quote(coin_id,source='coingecko'):
  def load():
   now=int(time.time())
   if source=='coingecko':
-   detail=market.detail(identity);coin=detail.get('coin')
-   if detail.get('stale') or not isinstance(coin,dict) or coin.get('id')!=identity:raise ValueError('Fresh coin identity unavailable')
-   stamp=coin.get('last_updated')
+   payload=market.request('/simple/price?'+urlencode({'ids':identity,'vs_currencies':'usd','include_last_updated_at':'true'}))
+   coin=payload.get(identity) if isinstance(payload,dict) else None
+   if not isinstance(coin,dict):raise ValueError('Coin price identity unavailable')
+   stamp=coin.get('last_updated_at')
    if isinstance(stamp,bool) or not isinstance(stamp,(int,float)) or not now-900<=stamp<=now+60:raise ValueError('Current coin price is outdated')
-   return {'coin_id':identity,'source':'CoinGecko','price':positive(coin.get('current_price')),'quote_currency':'USD','pair':None,'observed_at':int(stamp),'received_at':now,'timestamp_kind':'provider_update','coverage':'CoinGecko aggregate USD price; provider update time, not an exchange trade.'}
+   return {'coin_id':identity,'source':'CoinGecko','price':positive(coin.get('usd')),'quote_currency':'USD','pair':None,'observed_at':int(stamp),'received_at':int(time.time()),'timestamp_kind':'provider_update','coverage':'CoinGecko aggregate USD price; provider update time, not an exchange trade. Public provider caching applies.'}
   base=exchange.ASSETS[identity];unit='USDT' if source=='binance' else 'USD';pair=base+unit if source=='binance' else base+'-'+unit
   meta=exchange.metadata(source,pair,base,unit)
   if meta.get('stale') or meta.get('source')!=source or meta.get('pair')!=pair or meta.get('base_currency')!=base or meta.get('quote_currency')!=unit:raise ValueError('Fresh exchange identity unavailable')
@@ -41,4 +42,4 @@ def quote(coin_id,source='coingecko'):
    if stamp is None or not now-900<=stamp<=now+60:raise ValueError('Exchange last trade is outdated')
    kind='last_trade';coverage='Coinbase Exchange spot last trade in USD; event time may precede receipt time.'
   return {'coin_id':identity,'source':'Binance' if source=='binance' else 'Coinbase Exchange','price':positive(payload.get('price')),'base_currency':base,'quote_currency':unit,'pair':pair,'observed_at':stamp,'received_at':now,'timestamp_kind':kind,'coverage':coverage}
- return market.cached(('chart','current-quote',source,identity),20,load)
+ return market.cached(('chart','current-quote-v2',source,identity),60 if source=='coingecko' else 4,load)

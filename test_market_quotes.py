@@ -46,14 +46,27 @@ class QuoteTests(unittest.TestCase):
  def test_aggregate_identity_and_update_age(self):
   for coin in [{'id':'ethereum','current_price':'3','last_updated':NOW},{'id':'bitcoin','current_price':'3','last_updated':NOW-901},{'id':'bitcoin','current_price':'3','last_updated':True}]:
    m.CACHE.clear();m.FAILURES.clear()
-   with patch('coin_market.detail',return_value={'coin':coin}):
+   with patch('providers.request_json',return_value={coin['id']:{'usd':coin['current_price'],'last_updated_at':coin['last_updated']}}):
     with self.assertRaises(ValueError):q.quote('bitcoin')
  def test_aggregate_valid(self):
-  with patch('coin_market.detail',return_value={'coin':{'id':'bitcoin','current_price':'3','last_updated':NOW-1}}):r=q.quote('bitcoin')
+  with patch('providers.request_json',return_value={'bitcoin':{'usd':'3','last_updated_at':NOW-1}}):r=q.quote('bitcoin')
   self.assertEqual(r['price'],'3');self.assertEqual(r['quote_currency'],'USD');self.assertEqual(r['observed_at'],NOW-1)
  def test_outage_preserves_original_times(self):
   with patch('exchange_charts.metadata',return_value=self.meta()),patch('providers.request_json',return_value={'symbol':'BTCUSDT','price':'123'}):first=q.quote('bitcoin','binance')
   with patch('market_quotes.time.time',return_value=NOW+30),patch('exchange_charts.metadata',side_effect=ValueError('outage')):r=q.quote('bitcoin','binance')
   self.assertTrue(r['stale']);self.assertEqual(r['received_at'],first['received_at']);self.assertEqual(r['fetched_at'],first['fetched_at'])
+ def test_refresh_cache_expiry_by_source(self):
+  for source,ttl in [('binance',4),('coingecko',60)]:
+   m.CACHE.clear();m.FAILURES.clear()
+   payload={'symbol':'BTCUSDT','price':'123'} if source=='binance' else {'bitcoin':{'usd':'123','last_updated_at':NOW}}
+   with patch('exchange_charts.metadata',return_value=self.meta()),patch('providers.request_json',return_value=payload) as request:
+    q.quote('bitcoin',source)
+    with patch('market_quotes.time.time',return_value=NOW+ttl-1):q.quote('bitcoin',source)
+    self.assertEqual(request.call_count,1)
+    with patch('market_quotes.time.time',return_value=NOW+ttl+1):q.quote('bitcoin',source)
+    self.assertEqual(request.call_count,2)
+ def test_aggregate_uses_price_endpoint_not_detail_cache(self):
+  with patch('coin_market.detail',side_effect=AssertionError('Old detail cache used')),patch('providers.request_json',return_value={'bitcoin':{'usd':'123','last_updated_at':NOW}}) as request:q.quote('bitcoin')
+  self.assertIn('/simple/price?',request.call_args.args[0]);self.assertIn('include_last_updated_at=true',request.call_args.args[0])
 if __name__=='__main__':unittest.main()
 
