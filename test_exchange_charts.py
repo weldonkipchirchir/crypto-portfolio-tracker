@@ -106,4 +106,18 @@ class ExplicitIntervalTests(ExchangeTests):
   with patch('providers.request_json',side_effect=[self.meta(),[bn(start*1000)]*1000,[bn(start*1000)]*1000]):
    with self.assertRaises(ValueError):e.chart('bitcoin',7,'candles','binance','1h')
 
+class NewIntervalTests(unittest.TestCase):
+ setUp=ExchangeTests.setUp
+ meta=ExchangeTests.meta
+ def test_new_native_binance_intervals(self):
+  for code,seconds in [('1m',60),('5m',300),('30m',1800),('6h',21600)]:
+   m.CACHE.clear();start=(NOW//seconds-2)*seconds
+   with patch('providers.request_json',side_effect=[self.meta(),[bn(start*1000),bn((start+seconds)*1000)]]) as req:
+    result=e.chart('bitcoin',1,'candles','binance',code)
+   self.assertEqual(result['interval_seconds'],seconds);self.assertIn('interval='+code,req.call_args.args[0]);self.assertEqual(len(result['candles']),2)
+ def test_new_native_coinbase_interval(self):
+  start=NOW//21600*21600-43200
+  with patch('providers.request_json',side_effect=[self.meta('coinbase'),[cb(start),cb(start+21600)]]) as req:result=e.chart('bitcoin',1,'candles','coinbase','6h')
+  self.assertEqual(result['interval_seconds'],21600);self.assertIn('granularity=21600',req.call_args.args[0])
+
 if __name__=='__main__':unittest.main()

@@ -20,3 +20,11 @@ console.log('Safe Pine subset: templates, arithmetic/history, indicator vectors,
 
 r=run('indicator("ATR",overlay=false)\nplot(ta.atr(3))');assert.equal(r.ok,true);assert.equal(r.plots[0].values[2],2.5);
 r=run('indicator("Math functions")\nplot(math.max(nz(close[1], 0), 1))');assert.equal(r.ok,true);assert.deepEqual(r.plots[0].values.slice(0,3),[1,2,3]);
+
+r=run('// license\n//@version=6\nindicator(\n title="Long declaration",\n shorttitle="LD",\n overlay=true,\n max_lines_count=100,\n precision=2\n)\nplot(close)');assert.equal(r.ok,true);assert.equal(r.title,'Long declaration');assert.equal(r.plots[0].pane,'price');
+r=run('// license\n//@version=6\nindicator("Wrong conversion", initial_capital=10000)\nplot(close)');assert.equal(r.ok,false);assert.equal(r.diagnostics[0].line,3);assert.match(r.diagnostics[0].message,/initial_capital/);
+r=run('// license\n\nstrategy("Original",initial_capital=10000)');assert.equal(r.ok,false);assert.equal(r.diagnostics[0].line,3);assert.match(r.diagnostics[0].message,/strategy/);
+r=run('indicator("Multiline")\nplot(\n unknown\n)');assert.equal(r.ok,false);assert.equal(r.diagnostics[0].line,2);
+console.log('Pine named metadata, multiline declarations and original physical error lines passed.');
+
+const original=require('node:fs').readFileSync(require('node:path').join(__dirname,'fixtures/strategy-lab-original.pine'),'utf8');r=run(original);assert.equal(r.ok,false);assert.equal(r.diagnostics[0].line,5);assert.match(r.diagnostics[0].message,/strategy/);r=run(original.replace('strategy("Crypto','indicator("Crypto'));assert.equal(r.ok,false);assert.equal(r.diagnostics[0].line,5);assert.match(r.diagnostics[0].message,/initial_capital/);console.log('Supplied Strategy Lab script yields accurate strategy and conversion diagnostics.');

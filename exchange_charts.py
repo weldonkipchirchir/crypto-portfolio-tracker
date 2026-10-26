@@ -10,8 +10,8 @@ ASSETS={'bitcoin':'BTC','ethereum':'ETH','solana':'SOL','ripple':'XRP','cardano'
 ROOTS={'binance':'https://data-api.binance.vision','coinbase':'https://api.exchange.coinbase.com'}
 COINBASE_START=1420070400 # 2015-01-01, before the Coinbase Exchange launch.
 MAX_CHUNKS=16
-INTERVALS={'15m':900,'1h':3600,'4h':14400,'1d':86400,'1w':604800}
-INTERVAL_LABELS={'15m':'15-minute','1h':'hourly','4h':'4-hour','1d':'daily','1w':'weekly'}
+INTERVALS={'1m':60,'5m':300,'30m':1800,'6h':21600,'15m':900,'1h':3600,'4h':14400,'1d':86400,'1w':604800}
+INTERVAL_LABELS={'1m':'1-minute','5m':'5-minute','30m':'30-minute','6h':'6-hour','15m':'15-minute','1h':'hourly','4h':'4-hour','1d':'daily','1w':'weekly'}
 
 def iso(seconds):return datetime.datetime.fromtimestamp(seconds,datetime.timezone.utc).isoformat().replace('+00:00','Z')
 

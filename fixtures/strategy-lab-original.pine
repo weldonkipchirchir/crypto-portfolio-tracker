@@ -1,0 +1,91 @@
+// This Pine Script® code is subject to the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Adapted from the user's Donchian Ensemble and Combo Dashboard v7.
+// Research prototype; not a verified profitable system. Spot crypto only.
+//@version=6
+strategy("Crypto Strategy Lab: Ensemble / Pullback", overlay=true, initial_capital=10000, currency=currency.USD, commission_type=strategy.commission.percent, commission_value=0.10, slippage=10, margin_long=100, margin_short=100, pyramiding=1, calc_on_every_tick=false, calc_on_order_fills=false, process_orders_on_close=false)
+mode = input.string("Ensemble", "Method", options=["Ensemble", "Pullback"])
+start = input.time(timestamp("01 Jan 2020 00:00 +0000"), "Start (UTC)")
+finish = input.time(timestamp("01 Jan 2030 00:00 +0000"), "End (UTC)")
+cap = input.float(90, "Maximum allocation %", minval=1, maxval=95)
+targetVol = input.float(40, "Ensemble annual volatility target %", minval=1)
+volLen = input.int(30, "Volatility bars", minval=5)
+band = input.float(5, "Ensemble rebalance band (% equity)", minval=1, maxval=50)
+l1 = input.int(20, "Channel 1", minval=2)
+l2 = input.int(50, "Channel 2", minval=2)
+l3 = input.int(100, "Channel 3", minval=2)
+l4 = input.int(150, "Channel 4", minval=2)
+l5 = input.int(250, "Channel 5", minval=2)
+htf = input.timeframe("D", "Pullback higher timeframe (strictly higher)")
+useAdx = input.bool(false, "Pullback: require ADX and +DI")
+useVol = input.bool(false, "Pullback: require above-average volume")
+memory = input.int(6, "Pullback dip memory", minval=1)
+cooldown = input.int(10, "Pullback cooldown after entry", minval=1)
+riskPct = input.float(0.5, "Pullback equity risk % (before gaps/costs)", minval=0.1, maxval=2)
+stopAtr = input.float(2.5, "Pullback stop ATR", minval=0.5)
+reward = input.float(2, "Pullback target R", minval=0.5)
+if not chart.is_standard
+    runtime.error("Use standard candles, not synthetic chart prices.")
+if syminfo.type != "crypto"
+    runtime.error("This prototype uses 365-day crypto annualization and spot sizing.")
+if mode == "Ensemble" and not (timeframe.isdaily and timeframe.multiplier == 1)
+    runtime.error("Ensemble mode requires a 1D chart.")
+if mode == "Pullback" and timeframe.in_seconds(htf) <= timeframe.in_seconds()
+    runtime.error("Select a strictly higher timeframe. Example: 4h chart / D filter.")
+state(int length) =>
+    var bool active = false
+    upper = ta.highest(high, length)[1]
+    lower = ta.lowest(low, length)[1]
+    if barstate.isconfirmed and not na(upper)
+        if close > upper
+            active := true
+        else if close < (upper + lower) / 2
+            active := false
+    active
+s1 = state(l1)
+s2 = state(l2)
+s3 = state(l3)
+s4 = state(l4)
+s5 = state(l5)
+score = ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (s3 ? 1 : 0) + (s4 ? 1 : 0) + (s5 ? 1 : 0)) / 5.0
+rv = ta.stdev(math.log(close / close[1]), volLen) * math.sqrt(365)
+weight = not na(rv) and rv > 0 ? score * math.min(cap / 100, targetVol / 100 / rv) : 0.0
+ema50 = ta.ema(close, 50)
+ema200 = ta.ema(close, 200)
+[hc, he] = request.security(syminfo.tickerid, htf, [close[1], ta.ema(close, 50)[1]], lookahead=barmerge.lookahead_on)
+[basis, upperBb, lowerBb] = ta.bb(close, 20, 2)
+rsi = ta.rsi(close, 14)
+[macd, signal, hist] = ta.macd(close, 12, 26, 9)
+[plus, minus, adx] = ta.dmi(14, 14)
+atr = ta.atr(14)
+volumeAverage = ta.sma(volume, 20)
+dipAge = ta.barssince(low < lowerBb or rsi < 35)
+crossUp = ta.crossover(macd, signal)
+warmup = math.max(250, math.max(l1, math.max(l2, math.max(l3, math.max(l4, l5)))))
+ready = bar_index >= warmup and not na(atr) and not na(rv)
+inWindow = time >= start and time_close < finish
+var int lastEntry = na
+if barstate.isconfirmed
+    if not inWindow
+        strategy.cancel_all()
+        strategy.close_all(comment="Outside test window")
+    else if ready and strategy.equity > 0
+        if mode == "Ensemble"
+            // Cash/spot units. strategy.order nets quantities and ignores pyramiding.
+            // Resize on model changes or a material weight drift, not every tiny vol change.
+            currentWeight = strategy.position_size * close / strategy.equity
+            targetQty = strategy.equity * weight / close
+            delta = targetQty - strategy.position_size
+            changed = score != score[1]
+            if weight == 0 and strategy.position_size > 0
+                strategy.close_all(comment="All models OFF")
+            else if weight > 0 and (changed or math.abs(weight - currentWeight) >= band / 100)
+                if delta > 0
+                    strategy.order("Resize", strategy.long, qty=delta, comment="Increase allocation")
+                else if delta < 0
+                    strategy.order("Resize", strategy.short, qty=math.min(-delta, strategy.position_size), comment="Reduce allocation")
+        else
+            trendOk = ema50 > ema200 and close > ema200 and hc > he
+            adxOk = not useAdx or (adx >= 20 and plus > minus)
+            volumeOk = not useVol or (not na(volume) and volume > volumeAverage)
+            trigger = not na(dipAge) and dipAge <= memory and crossUp and macd < 0
+            cooled = na(lastEntry) or bar_index - lastEntry >= cooldown
