@@ -14,6 +14,9 @@ def initialize():
   init();cloud_storage.initialize_limits();_ready=True
 class handler(Handler):
  def dispatch(self,method):
+  # Public assets must remain available during database outages and cold starts.
+  if method=='do_GET' and self.path!='/api/state':
+   return super().do_GET()
   try:initialize()
   except Exception:self.send(503,{'error':'Hosted storage is not configured or unavailable'});return
   try:getattr(super(),method)()

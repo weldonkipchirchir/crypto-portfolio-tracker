@@ -85,7 +85,11 @@ def cached(key,ttl,loader,force=False):
   if prior is None and callbacks:
    try:
     saved=callbacks[0](key)
-    if isinstance(saved,dict) and isinstance(saved.get('fetched_at'),int) and 0<=now-saved['fetched_at']<604800:prior=(saved['fetched_at'],saved)
+    if isinstance(saved,dict) and isinstance(saved.get('fetched_at'),int) and 0<=now-saved['fetched_at']<604800:
+     prior=(saved['fetched_at'],saved)
+     # Hydrate the warm worker cache: otherwise every poll repeats a cloud DB read.
+     with LOCK:
+      if len(CACHE)<400:CACHE[key]=prior
    except Exception:pass
   if prior and (now-prior[0]<ttl or (force and now-prior[0]<30)):return copy.deepcopy(prior[1])
   if now-failed<30:

@@ -231,9 +231,8 @@ class Handler(BaseHTTPRequestHandler):
   return row[0] if row else None
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
-  static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8'),'/market_dashboard.js':('market_dashboard.js','text/javascript; charset=utf-8'),'/market_dashboard.css':('market_dashboard.css','text/css; charset=utf-8'),'/market_intelligence.js':('market_intelligence.js','text/javascript; charset=utf-8'),'/trade_chart_markers.js':('trade_chart_markers.js','text/javascript; charset=utf-8'),'/market_intelligence.css':('market_intelligence.css','text/css; charset=utf-8')}
-  for filename in ('indicator_library.js','studio_storage.js','chart_panels.js','pine_bridge.js','pine_editor.js','coin_alerts.js','experience_ui.js','chart_tools.js','experience_ui.css','chart_tools.css'):
-   static['/'+filename]=(filename,('text/javascript' if filename.endswith('.js') else 'text/css')+'; charset=utf-8')
+  from static_assets import STATIC_FILES
+  static=STATIC_FILES
   if self.path in static:
    filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
    if filename=='index.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
