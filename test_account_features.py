@@ -57,6 +57,22 @@ class AccountFeaturesTests(unittest.TestCase):
   for asset in ['<script>','BTC\u202e',' BTC','USDT\n','a'*65]:
    with patch.object(e,'signed',side_effect=[permissions,{'balances':[{'asset':asset,'free':'1','locked':'0'}]}]),self.assertRaisesRegex(ValueError,'BALANCE_ASSET') as error:e.snapshot('fake-key','fake-secret')
    self.assertNotIn(asset,str(error.exception));self.assertNotIn('fake-secret',str(error.exception))
+ def test_ld_display_uses_verified_earn_amount_not_one_to_one(self):
+  permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
+  account={'balances':[{'asset':'LDBNB','free':'1','locked':'0'},{'asset':'LDUSDT','free':'2','locked':'0'},{'asset':'BNB','free':'0.5','locked':'0'}]}
+  positions={'total':2,'rows':[{'asset':'BNB','productId':'BNB001','totalAmount':'1.25'},{'asset':'USDT','productId':'USDT001','totalAmount':'2.1'}]}
+  quotes={'coins':[{'id':'binancecoin','current_price':600},{'id':'tether','current_price':1}]}
+  with patch.object(e,'signed',side_effect=[permissions,account,positions]),patch.object(e.coin_market,'listings',return_value=quotes):result=e.snapshot('key','secret')
+  bnb,usdt,spot=result['balances'];self.assertEqual(bnb['asset'],'LDBNB');self.assertEqual(bnb['display_asset'],'BNB');self.assertEqual(bnb['quantity'],'1');self.assertEqual(bnb['display_quantity'],'1.25');self.assertEqual(bnb['value_usd'],'750.00');self.assertEqual(usdt['value_usd'],'2.1');self.assertEqual(spot['value_usd'],'300.0');self.assertEqual(len(result['balances']),3)
+  with patch.object(e,'signed',side_effect=[permissions,account,ValueError('private response')]),patch.object(e.coin_market,'listings',return_value=quotes):missing=e.snapshot('key','secret')
+  self.assertIsNone(missing['balances'][0]['value_usd']);self.assertEqual(missing['earn_status'],'unavailable');self.assertNotIn('private response',json.dumps(missing))
+  self.assertEqual(e.display_asset('LDO'),'LDO');self.assertEqual(e.display_asset('LDUNKNOWN'),'LDUNKNOWN')
+ def test_earn_position_pages_and_no_duplicate_products(self):
+  rows=[{'asset':'BNB','productId':str(i),'totalAmount':'0.1'} for i in range(100)]
+  with patch.object(e,'signed',side_effect=[{'rows':rows,'total':101},{'rows':[{'asset':'BNB','productId':'last','totalAmount':'0.2'}],'total':101}]) as signed:
+   self.assertEqual(e.earn_positions('key','secret')['BNB'],__import__('decimal').Decimal('10.2'));self.assertEqual(signed.call_count,2)
+  for response in [{'rows':rows[:1]*2,'total':2},{'rows':[],'total':301},{'rows':[],'total':1}]:
+   with patch.object(e,'signed',return_value=response),self.assertRaises(ValueError):e.earn_positions('key','secret')
  def test_binance_safe_diagnostic_codes(self):
   permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
   for rows,code in [(None,'BALANCE_LIST'),([False],'BALANCE_ROW'),([{'asset':'BTC','free':'NaN','locked':'0'}],'BALANCE_AMOUNT'),([{'asset':'BTC','free':'1','locked':'0'}]*2,'BALANCE_DUPLICATE')]:

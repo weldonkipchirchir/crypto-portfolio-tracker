@@ -6,7 +6,8 @@ import providers
 import exchange_charts
 import coin_market
 PERMISSIONS=('enableWithdrawals','enableInternalTransfer','enableMargin','enableFutures','permitsUniversalTransfer','enableVanillaOptions','enableFixApiTrade','enableSpotAndMarginTrading','enablePortfolioMarginTrading')
-PATHS=('/sapi/v1/account/apiRestrictions','/api/v3/account')
+PATHS=('/sapi/v1/account/apiRestrictions','/api/v3/account','/sapi/v1/simple-earn/flexible/position')
+EARN_SYMBOLS=set('BNB BTC USDT ETH LINK XRP XLM USDC UNI ALGO FET SOL HBAR AAVE AVAX CELR NEAR RAY QNT INJ GMX FLUX SUI PENDLE SEI ENA TAO G RENDER POL BNSOL ONDO 0G'.split())
 
 def init(c):
  c.execute('CREATE TABLE IF NOT EXISTS exchange_connections (user_id INTEGER NOT NULL,id TEXT NOT NULL,label TEXT NOT NULL,credentials TEXT NOT NULL,snapshot TEXT NOT NULL,PRIMARY KEY(user_id,id))')
@@ -71,10 +72,13 @@ def rewrap_credentials(c,uid):
 class NoRedirect(urllib.request.HTTPRedirectHandler):
  def redirect_request(self,*args,**kwargs):return None
 
-def signed(path,key,secret):
+def signed(path,key,secret,*,page=1):
  if path not in PATHS:raise ValueError('Unsupported exchange operation')
  params={'timestamp':int(time.time()*1000),'recvWindow':5000}
  if path==PATHS[1]:params['omitZeroBalances']='true'
+ if path==PATHS[2]:
+  if type(page) is not int or not 1<=page<=3:raise ValueError('Invalid Earn position page')
+  params.update(current=page,size=100)
  query=urlencode(params)
  signature=hmac.new(secret.encode(),query.encode(),hashlib.sha256).hexdigest()
  req=urllib.request.Request('https://api.binance.com'+path+'?'+query+'&signature='+signature,headers={'X-MBX-APIKEY':key,'User-Agent':'OrbitPortfolio/1.0'})
@@ -93,6 +97,30 @@ def validate_credentials(raw):
  key=raw.get('api_key');secret=raw.get('api_secret')
  if not all(isinstance(x,str) and re.fullmatch(r'[A-Za-z0-9]{32,128}',x) for x in (key,secret)):raise ValueError('Enter a Binance HMAC API key and secret')
  return key,secret
+
+def earn_positions(key,secret):
+ totals={};seen=set();received=0
+ for page in range(1,4):
+  result=signed(PATHS[2],key,secret,page=page)
+  rows=result.get('rows');total=result.get('total')
+  if not isinstance(rows,list) or len(rows)>100 or type(total) is not int or not 0<=total<=300:raise ValueError('Earn position response unavailable')
+  for row in rows:
+   if not isinstance(row,dict):raise ValueError('Earn position response unavailable')
+   asset=row.get('asset');product=row.get('productId');amount=row.get('totalAmount')
+   if not isinstance(asset,str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}',asset) or not isinstance(product,str) or not 1<=len(product)<=100 or product in seen or not isinstance(amount,str) or len(amount)>80:raise ValueError('Earn position response unavailable')
+   seen.add(product)
+   try:value=Decimal(amount)
+   except InvalidOperation:raise ValueError('Earn position response unavailable') from None
+   if not value.is_finite() or value<0 or value.adjusted()>30 or value.as_tuple().exponent< -30:raise ValueError('Earn position response unavailable')
+   with localcontext() as ctx:
+    ctx.prec=128;totals[asset]=totals.get(asset,Decimal(0))+value
+  received+=len(rows)
+  if received==total:return totals
+  if not rows or received>total:raise ValueError('Earn position response unavailable')
+ raise ValueError('Earn position response incomplete')
+
+def display_asset(asset):
+ return asset[2:] if isinstance(asset,str) and asset.startswith('LD') and asset[2:] in EARN_SYMBOLS else asset
 
 def snapshot(key,secret):
  permissions=signed(PATHS[0],key,secret)
@@ -132,23 +160,38 @@ def snapshot(key,secret):
    balances.append({'asset':asset,'free':str(free),'locked':str(locked),'quantity':str(quantity)})
   except (ValueError,KeyError,TypeError,InvalidOperation):raise ValueError('Invalid Binance balance response ('+reason+')') from None
  # Curated exchange asset IDs only. Unknown symbols remain explicitly unpriced.
- identities={symbol:identity for identity,symbol in exchange_charts.ASSETS.items()};identities.update(USDC='usd-coin',USDT='tether',BNB='binancecoin')
+ identities={symbol:identity for identity,symbol in exchange_charts.ASSETS.items()};identities.update(USDC='usd-coin',USDT='tether',BNB='binancecoin',ALGO='algorand',FET='fetch-ai',HBAR='hedera-hashgraph',CELR='celer-network',RAY='raydium',QNT='quant-network',INJ='injective-protocol',GMX='gmx',FLUX='zelcash',PENDLE='pendle',SEI='sei-network',ENA='ethena',TAO='bittensor',RENDER='render-token',POL='polygon-ecosystem-token',BNSOL='binance-staked-sol',ONDO='ondo-finance')
  try:quotes={r['id']:r for r in coin_market.listings()['coins']}
  except ValueError:quotes={}
+ earn={};earn_error=False
+ if any(display_asset(r['asset'])!=r['asset'] for r in balances):
+  try:earn=earn_positions(key,secret)
+  except Exception:earn_error=True
  for row in balances:
-  identity=identities.get(row['asset']);quote=quotes.get(identity,{})
+  symbol=display_asset(row['asset']);wrapped=symbol!=row['asset'];row['display_asset']=symbol;row['account_type']='Earn' if wrapped else 'Spot'
+  amount=earn.get(symbol) if wrapped else Decimal(row['quantity'])
+  row['display_quantity']=format(amount if amount is not None else Decimal(row['quantity']),'f')
+  row['valuation_basis']='verified_earn_underlying' if wrapped and amount is not None else 'earn_balance_unverified' if wrapped else 'spot_balance'
+  identity=identities.get(symbol);quote=quotes.get(identity,{})
   row['coin_id']=identity;row['price_usd']=quote.get('current_price');row['change_24h_pct']=quote.get('price_change_percentage_24h');row['price_updated_at']=quote.get('last_updated')
   with localcontext() as context:
    context.prec=160
-   row['value_usd']=str(Decimal(row['quantity'])*Decimal(str(row['price_usd']))) if row['price_usd'] is not None else None
- return {'balances':balances,'updated_at':int(time.time()),'coverage':'Binance Spot free + locked balances only. Earn, futures, margin and historical cost basis are not included. Manual refresh.','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
+   price=row['price_usd']
+   row['value_usd']=str(amount*Decimal(str(price))) if amount is not None and isinstance(price,(str,int,float)) and not isinstance(price,bool) and Decimal(str(price)).is_finite() and Decimal(str(price))>=0 else None
+ return {'balances':balances,'updated_at':int(time.time()),'coverage':'Spot balances plus matched Simple Earn Flexible positions. LD identifiers are retained; displayed Earn amounts use verified underlying totalAmount. Futures, margin, other Earn products and historical cost basis are not included. Manual refresh.','earn_status':'unavailable' if earn_error else 'partial' if any(r['valuation_basis']=='earn_balance_unverified' for r in balances) else 'checked' if earn else 'none','permissions_verified':True,'ip_restricted':permissions.get('ipRestrict') is True}
+
+def display_snapshot(snapshot):
+ for row in snapshot.get('balances',[]):
+  row.setdefault('display_asset',display_asset(row.get('asset')))
+  if row['display_asset']!=row.get('asset'):row.setdefault('account_type','Earn')
+ return snapshot
 
 def state(c,uid):
  try:encryption_keys();configured=True
  except ValueError:configured=False
  connections=[]
  for row in c.execute('SELECT id,label,snapshot FROM exchange_connections WHERE user_id=? ORDER BY label,id',(uid,)):
-  connections.append({'id':row['id'],'label':row['label'],'exchange':'binance','snapshot':json.loads(row['snapshot'])})
+  connections.append({'id':row['id'],'label':row['label'],'exchange':'binance','snapshot':display_snapshot(json.loads(row['snapshot']))})
  return {'configured':configured,'connections':connections}
 
 def prepare(raw):

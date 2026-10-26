@@ -1,6 +1,6 @@
 # Exchange credentials and operating limits
 
-Orbit supports Binance HMAC API keys for read-only Spot balance snapshots. It verifies the permission endpoint before reading balances, including on every manual sync. Trading, withdrawal and transfer permissions are rejected; missing permission flags are not accepted as proof of safety. Earn, futures, margin and historical purchase costs are not imported. Holdings appear separately on Overview to prevent double counting wallet and ledger balances.
+Orbit supports Binance HMAC API keys for read-only Spot balance snapshots. It verifies the permission endpoint before reading balances, including on every manual sync. Trading, withdrawal and transfer permissions are rejected; missing permission flags are not accepted as proof of safety. Matched Simple Earn Flexible balances are queried read-only when LD positions are returned. Futures, margin, other Earn products and historical purchase costs are not imported. Holdings appear separately on Overview to prevent double counting wallet and ledger balances.
 
 ## Credential storage
 
@@ -32,3 +32,8 @@ Do not paste credentials into chat. Real credential verification depends on Bina
 - [OWASP Key Management](https://cheatsheetseries.owasp.org/cheatsheets/Key_Management_Cheat_Sheet.html): restricted custody, lifecycle and rotation.
 - [Binance API key permissions](https://developers.binance.com/en/docs/catalog/core-trading-wallet/api/rest-api/account): verified read-only flags.
 - [Vercel Secret variables](https://vercel.com/changelog/environment-variables-now-use-config-and-secret-types): production configuration custody.
+
+
+LD display and valuation: supported LD identifiers display as their underlying symbol with an Earn label, while raw identifiers and quantities remain preserved. Valuation uses matched Flexible Earn `totalAmount` from the fully paginated read-only `/sapi/v1/simple-earn/flexible/position` response, never a presumed 1:1 LD conversion. Only existing LD rows are valued; the same Earn position is not appended again. Spot rows remain separate. Pagination is bounded to 300 positions and unverified/missing responses leave Earn values unpriced. Pricing still depends on curated CoinGecko identities and available quotes. Unknown or ambiguous assets remain unpriced. Existing saved connections get display names on read; Sync balances fetches Earn quantities and new values.
+
+References: [Binance Flexible positions](https://developers.binance.com/en/docs/catalog/investment-and-services-simple-earn/api/rest-api/flexible-locked#get-flexible-product-position-user_data), [Binance LDUSDT conversion explanation](https://www.binance.com/en-IN/support/faq/detail/a3e0a836380f4ef08ea46f9e2e67b4fd).
