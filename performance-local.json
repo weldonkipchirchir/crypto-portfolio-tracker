@@ -1,0 +1,248 @@
+{
+  "scope": "Local loopback burst only; not Vercel/Neon capacity or a sustained users test",
+  "date_utc": "2026-10-26T20:24:40Z",
+  "python": "3.12.2",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cpu_count": 8,
+  "fixture": {
+    "accounts": 100,
+    "trades_per_account": 20,
+    "wallets": 0,
+    "external_provider_calls": 0,
+    "database": "temporary SQLite",
+    "server_workers": 24,
+    "server_backlog": 32,
+    "timeout_seconds": 10
+  },
+  "method": "Async clients released together; arrival scheduling is OS-dependent. Separate server process, same machine. One request per client, no retries. Latency includes connect, queue and complete response. HTTP 200 state responses checked for account identity and 20 trades. Static assets use local HTTP server, not production CDN.",
+  "results": [
+    {
+      "path": "/app.html",
+      "burst_requests": 20,
+      "elapsed_seconds": 0.018,
+      "statuses": {
+        "200": 20
+      },
+      "success_percent": 100.0,
+      "successful_requests_per_second": 1119.88,
+      "all_attempt_latency_ms": {
+        "p50": 12.5,
+        "p95": 13.7,
+        "p99": 13.7
+      },
+      "success_latency_ms": {
+        "p50": 12.5,
+        "p95": 13.7,
+        "p99": 13.7
+      }
+    },
+    {
+      "path": "/api/state",
+      "burst_requests": 20,
+      "elapsed_seconds": 0.072,
+      "statuses": {
+        "200": 20
+      },
+      "success_percent": 100.0,
+      "successful_requests_per_second": 279.09,
+      "all_attempt_latency_ms": {
+        "p50": 40.5,
+        "p95": 67.6,
+        "p99": 69.0
+      },
+      "success_latency_ms": {
+        "p50": 40.5,
+        "p95": 67.6,
+        "p99": 69.0
+      }
+    },
+    {
+      "path": "/app.html",
+      "burst_requests": 100,
+      "elapsed_seconds": 0.056,
+      "statuses": {
+        "200": 78,
+        "ConnectionAbortedError": 22
+      },
+      "success_percent": 78.0,
+      "successful_requests_per_second": 1397.54,
+      "all_attempt_latency_ms": {
+        "p50": 37.5,
+        "p95": 41.8,
+        "p99": 42.2
+      },
+      "success_latency_ms": {
+        "p50": 38.3,
+        "p95": 42.1,
+        "p99": 42.2
+      }
+    },
+    {
+      "path": "/api/state",
+      "burst_requests": 100,
+      "elapsed_seconds": 0.13,
+      "statuses": {
+        "200": 29,
+        "ConnectionAbortedError": 68,
+        "503": 3
+      },
+      "success_percent": 29.0,
+      "successful_requests_per_second": 223.42,
+      "all_attempt_latency_ms": {
+        "p50": 49.8,
+        "p95": 122.1,
+        "p99": 123.4
+      },
+      "success_latency_ms": {
+        "p50": 119.8,
+        "p95": 123.4,
+        "p99": 124.0
+      }
+    },
+    {
+      "path": "/app.html",
+      "burst_requests": 1000,
+      "elapsed_seconds": 0.837,
+      "statuses": {
+        "200": 226,
+        "ConnectionAbortedError": 774
+      },
+      "success_percent": 22.6,
+      "successful_requests_per_second": 269.87,
+      "all_attempt_latency_ms": {
+        "p50": 517.9,
+        "p95": 636.2,
+        "p99": 657.9
+      },
+      "success_latency_ms": {
+        "p50": 610.3,
+        "p95": 657.8,
+        "p99": 658.8
+      }
+    },
+    {
+      "path": "/api/state",
+      "burst_requests": 1000,
+      "elapsed_seconds": 1.337,
+      "statuses": {
+        "200": 150,
+        "ConnectionAbortedError": 776,
+        "503": 74
+      },
+      "success_percent": 15.0,
+      "successful_requests_per_second": 112.19,
+      "all_attempt_latency_ms": {
+        "p50": 495.3,
+        "p95": 667.4,
+        "p99": 695.7
+      },
+      "success_latency_ms": {
+        "p50": 651.0,
+        "p95": 707.3,
+        "p99": 1130.3
+      }
+    }
+  ],
+  "recovery": [
+    {
+      "path": "/api/state",
+      "burst_requests": 1,
+      "elapsed_seconds": 0.008,
+      "statuses": {
+        "200": 1
+      },
+      "success_percent": 100.0,
+      "successful_requests_per_second": 129.22,
+      "all_attempt_latency_ms": {
+        "p50": 6.8,
+        "p95": 6.8,
+        "p99": 6.8
+      },
+      "success_latency_ms": {
+        "p50": 6.8,
+        "p95": 6.8,
+        "p99": 6.8
+      }
+    },
+    {
+      "path": "/api/state",
+      "burst_requests": 1,
+      "elapsed_seconds": 0.007,
+      "statuses": {
+        "200": 1
+      },
+      "success_percent": 100.0,
+      "successful_requests_per_second": 148.92,
+      "all_attempt_latency_ms": {
+        "p50": 6.4,
+        "p95": 6.4,
+        "p99": 6.4
+      },
+      "success_latency_ms": {
+        "p50": 6.4,
+        "p95": 6.4,
+        "p99": 6.4
+      }
+    },
+    {
+      "path": "/api/state",
+      "burst_requests": 1,
+      "elapsed_seconds": 0.005,
+      "statuses": {
+        "200": 1
+      },
+      "success_percent": 100.0,
+      "successful_requests_per_second": 217.01,
+      "all_attempt_latency_ms": {
+        "p50": 4.4,
+        "p95": 4.4,
+        "p99": 4.4
+      },
+      "success_latency_ms": {
+        "p50": 4.4,
+        "p95": 4.4,
+        "p99": 4.4
+      }
+    },
+    {
+      "path": "/api/state",
+      "burst_requests": 1,
+      "elapsed_seconds": 0.005,
+      "statuses": {
+        "200": 1
+      },
+      "success_percent": 100.0,
+      "successful_requests_per_second": 186.53,
+      "all_attempt_latency_ms": {
+        "p50": 5.1,
+        "p95": 5.1,
+        "p99": 5.1
+      },
+      "success_latency_ms": {
+        "p50": 5.1,
+        "p95": 5.1,
+        "p99": 5.1
+      }
+    },
+    {
+      "path": "/api/state",
+      "burst_requests": 1,
+      "elapsed_seconds": 0.006,
+      "statuses": {
+        "200": 1
+      },
+      "success_percent": 100.0,
+      "successful_requests_per_second": 171.28,
+      "all_attempt_latency_ms": {
+        "p50": 5.5,
+        "p95": 5.5,
+        "p99": 5.5
+      },
+      "success_latency_ms": {
+        "p50": 5.5,
+        "p95": 5.5,
+        "p99": 5.5
+      }
+    }
+  ]
+}
