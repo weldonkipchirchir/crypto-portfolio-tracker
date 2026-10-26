@@ -29,3 +29,6 @@ jobs:
       - run: node target_dashboard.test.cjs
       - run: node market_dashboard.test.cjs
       - run: node market_intelligence.test.cjs
+      - run: node chart_tools.test.cjs
+      - run: node experience_ui.test.cjs
+      - run: node coin_alerts.test.cjs

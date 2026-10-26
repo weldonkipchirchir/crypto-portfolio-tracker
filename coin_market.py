@@ -63,10 +63,24 @@ def request(path):
  key=os.environ.get('COINGECKO_DEMO_API_KEY','').strip()
  return providers.request_json(BASE+path,headers={'x-cg-demo-api-key':key} if key else None)
 
-def cached(key,ttl,loader,force=False):
- # One lock coalesces provider calls and bounds global quota pressure across requests.
+KEY_LOCKS={}
+@contextmanager
+def key_lock(key):
+ # Retain locks only while used; unrelated feeds do not wait behind slow HTTP.
  with LOCK:
-  now=time.time();prior=CACHE.get(key)
+  lock,users=KEY_LOCKS.get(key,(threading.RLock(),0));KEY_LOCKS[key]=(lock,users+1)
+ try:
+  with lock:yield
+ finally:
+  with LOCK:
+   lock,users=KEY_LOCKS[key]
+   if users==1:del KEY_LOCKS[key]
+   else:KEY_LOCKS[key]=(lock,users-1)
+
+def cached(key,ttl,loader,force=False):
+ with key_lock(key):
+  now=time.time()
+  with LOCK:prior=CACHE.get(key);failed=FAILURES.get(key,0)
   callbacks=getattr(STORE,'callbacks',None)
   if prior is None and callbacks:
    try:
@@ -74,20 +88,22 @@ def cached(key,ttl,loader,force=False):
     if isinstance(saved,dict) and isinstance(saved.get('fetched_at'),int) and 0<=now-saved['fetched_at']<604800:prior=(saved['fetched_at'],saved)
    except Exception:pass
   if prior and (now-prior[0]<ttl or (force and now-prior[0]<30)):return copy.deepcopy(prior[1])
-  if now-FAILURES.get(key,0)<30:
+  if now-failed<30:
    if prior:return dict(copy.deepcopy(prior[1]),stale=True,error='Provider unavailable; showing the last saved market response.')
    raise ValueError('Market provider is temporarily unavailable. Retry shortly.')
   try:
-   data=loader();data.update(source=data.get('source','CoinGecko'),fetched_at=int(now),stale=False)
+   data=loader();data.update(source=data.get('source','CoinGecko'),fetched_at=int(time.time()),stale=False)
   except (ValueError,TypeError,KeyError,AttributeError):
-   if len(FAILURES)>=200:FAILURES.pop(next(iter(FAILURES)))
-   FAILURES[key]=now
+   with LOCK:
+    if len(FAILURES)>=200:FAILURES.pop(next(iter(FAILURES)))
+    FAILURES[key]=time.time()
    if prior:return dict(copy.deepcopy(prior[1]),stale=True,error='Provider unavailable; showing the last saved market response.')
    raise ValueError('Market provider is temporarily unavailable. Retry shortly.') from None
-  prefix=key[0];cap={'list':1,'detail':100,'chart':80,'fundamentals':100}[prefix]
-  related=[k for k in CACHE if k[0]==prefix]
-  if key not in CACHE and len(related)>=cap:CACHE.pop(min(related,key=lambda k:CACHE[k][0]))
-  CACHE[key]=(now,data);FAILURES.pop(key,None)
+  with LOCK:
+   prefix=key[0];cap={'list':1,'detail':100,'chart':80,'fundamentals':100}[prefix]
+   related=[k for k in CACHE if k[0]==prefix]
+   if key not in CACHE and len(related)>=cap:CACHE.pop(min(related,key=lambda k:CACHE[k][0]))
+   CACHE[key]=(time.time(),data);FAILURES.pop(key,None)
   if callbacks:
    try:callbacks[1](key,data)
    except Exception:pass
@@ -142,6 +158,8 @@ def detail(coin_id):
   for field in ('circulating_supply','total_supply','max_supply','price_change_percentage_24h'):raw[field]=market.get(field)
   row=coin_row(raw)
   if not row:raise ValueError('Invalid coin detail')
+  platforms=payload.get('platforms',{})
+  row['platforms']={k:v for k,v in platforms.items() if isinstance(k,str) and re.fullmatch(r'[a-z0-9-]{1,80}',k) and isinstance(v,str) and 1<=len(v)<=100} if isinstance(platforms,dict) else {}
   row['categories']=[text(x,80) for x in (payload.get('categories') or [])[:12] if isinstance(x,str)]
   row['description']=text((payload.get('description') or {}).get('en'),1000)
   websites=(payload.get('links') or {}).get('homepage') or []

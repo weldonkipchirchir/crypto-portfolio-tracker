@@ -134,16 +134,21 @@ def daily_rsi(payload,now=None):
 
 def rsi():
  def load():
-  rows=[]
-  for identity in RSI_ASSETS:
-   row={'coin_id':identity,'symbol':exchange_charts.ASSETS[identity],'available':False,'value':None,'signal':None,'source':None,'pair':None,'observed_at':None}
-   for source in ('binance','coinbase'):
-    try:
-     payload=exchange_charts.chart(identity,90,'candles',source);value,stamp=daily_rsi(payload)
-     row.update(available=True,value=round(value,2),signal='overbought' if value>=70 else 'oversold' if value<=30 else 'neutral',source=payload.get('source'),pair=payload.get('pair'),observed_at=stamp);break
-    except ValueError:pass
-   if not row['available']:row['error']='Verified consecutive daily candles unavailable.'
-   rows.append(row)
+  from concurrent.futures import ThreadPoolExecutor
+  from contextlib import nullcontext
+  callbacks=getattr(m.STORE,'callbacks',None);cutoff=getattr(providers._REQUEST_CONTEXT,'cutoff',None) or time.monotonic()+25
+  # Bounded parallelism; preserve request deadline and public-cache persistence.
+  def observe(identity):
+   with providers.deadline(cutoff), (m.persistence(*callbacks) if callbacks else nullcontext()):
+    row={'coin_id':identity,'symbol':exchange_charts.ASSETS[identity],'available':False,'value':None,'signal':None,'source':None,'pair':None,'observed_at':None}
+    for source in ('binance','coinbase'):
+     try:
+      payload=exchange_charts.chart(identity,90,'candles',source);value,stamp=daily_rsi(payload)
+      row.update(available=True,value=round(value,2),signal='overbought' if value>=70 else 'oversold' if value<=30 else 'neutral',source=payload.get('source'),pair=payload.get('pair'),observed_at=stamp);break
+     except ValueError:pass
+    if not row['available']:row['error']='Verified consecutive daily candles unavailable.'
+    return row
+  with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(observe,RSI_ASSETS))
   if not any(r['available'] for r in rows):raise ValueError('Daily RSI providers unavailable')
   return {'rows':rows,'period':14,'interval':'daily','source':'Exchange spot candles','coverage':'Wilder RSI(14), latest completed UTC daily candle, eight curated spot assets. Binance USDT with Coinbase USD fallback; venue and pair are shown per asset. At least 15 consecutive closes required; no interpolated gaps. Overbought >=70, oversold <=30; not a trade recommendation.'}
  return m.cached(('fundamentals','intelligence-rsi'),900,load)

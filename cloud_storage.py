@@ -72,14 +72,20 @@ def allowance(key,limit,seconds):
   c.execute('DELETE FROM orbit_limits WHERE expires<EXTRACT(EPOCH FROM clock_timestamp())-86400')
   return row['hits']<=limit
 @contextmanager
-def provider_action(uid,*,kind='provider',limit=12):
+def provider_action(uid,*,kind='provider',limit=12,max_concurrent=1):
  import secrets
  from runtime_security import BudgetExceeded
+ if max_concurrent not in (1,4):raise ValueError('Invalid operation concurrency')
  key=kind+':'+str(uid);token=secrets.token_hex(16)
  if not allowance(key,limit,60):raise BudgetExceeded('Provider request budget reached. Retry shortly.')
  with connect() as c:
-  row=c.execute('INSERT INTO orbit_leases VALUES (?,?,EXTRACT(EPOCH FROM clock_timestamp())+60) ON CONFLICT (key) DO UPDATE SET token=EXCLUDED.token,expires=EXCLUDED.expires WHERE orbit_leases.expires<=EXTRACT(EPOCH FROM clock_timestamp()) RETURNING key',(key,token)).fetchone()
-  if not row:raise BudgetExceeded('A provider operation is already running for this account')
+  leased=None
+  for slot in range(max_concurrent):
+   candidate=key if max_concurrent==1 else key+':slot:'+str(slot)
+   row=c.execute('INSERT INTO orbit_leases VALUES (?,?,EXTRACT(EPOCH FROM clock_timestamp())+60) ON CONFLICT (key) DO UPDATE SET token=EXCLUDED.token,expires=EXCLUDED.expires WHERE orbit_leases.expires<=EXTRACT(EPOCH FROM clock_timestamp()) RETURNING key',(candidate,token)).fetchone()
+   if row:leased=candidate;break
+  if leased is None:raise BudgetExceeded('A provider operation is already running for this account')
+ key=leased
  try:yield
  finally:
   with connect() as c:c.execute('DELETE FROM orbit_leases WHERE key=? AND token=?',(key,token))

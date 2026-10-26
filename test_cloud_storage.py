@@ -43,6 +43,23 @@ class CloudTests(base.APITests):
   import test_features
   test_features.FeatureAPITests.test_concurrent_sales_cannot_oversell(self)
 
+ def test_new_account_workspaces(self):
+  import test_upgrades_api
+  test_upgrades_api.UpgradeTests.test_profile_notes_setups_scope(self)
+ def test_new_multi_network_wallets(self):
+  import test_upgrades_api
+  test_upgrades_api.UpgradeTests.test_multichain_atomic_idempotent(self)
+ def test_market_parallel_leases_remain_bounded(self):
+  from contextlib import ExitStack
+  from runtime_security import BudgetExceeded
+  with ExitStack() as stack:
+   for _ in range(4):stack.enter_context(cloud_storage.provider_action(999,kind='market',limit=60,max_concurrent=4))
+   with self.assertRaises(BudgetExceeded):
+    with cloud_storage.provider_action(999,kind='market',limit=60,max_concurrent=4):pass
+  with cloud_storage.provider_action(999,kind='market',limit=60,max_concurrent=4):pass
+ def test_coin_alert_routes_cloud(self):
+  import test_upgrades_api
+  test_upgrades_api.UpgradeTests.test_coin_alert_routes_are_account_scoped(self)
  def setUp(self):
   import psycopg
   from psycopg import sql

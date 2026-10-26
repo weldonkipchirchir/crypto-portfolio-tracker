@@ -11,6 +11,11 @@ import protocol_data
 import market_news
 import market_intelligence
 import market_microstructure
+import coin_alerts
+import account_features
+import exchange_connections
+import workspace_features
+import wallet_batch
 import market_watch
 import exchange_charts
 import history
@@ -18,7 +23,7 @@ import review
 import review_accounting
 from runtime_security import BoundedHTTPServer, ProviderBudget, BudgetExceeded
 PROVIDER_BUDGET=ProviderBudget()
-MARKET_BUDGET=ProviderBudget(limit=60)
+MARKET_BUDGET=ProviderBudget(limit=60,per_user_concurrent=4)
 from concurrent.futures import ThreadPoolExecutor
 import csv, hashlib, hmac, io, json, os, secrets, sqlite3, time, re, threading
 from urllib.parse import urlsplit
@@ -68,6 +73,10 @@ def init():
   advanced_portfolio.init(c)
   price_targets.init(c)
   market_watch.init(c)
+  coin_alerts.init(c)
+  account_features.init(c)
+  exchange_connections.init(c)
+  workspace_features.init(c)
   c.execute('CREATE TABLE IF NOT EXISTS coin_market_cache (key TEXT PRIMARY KEY,fetched_at INTEGER NOT NULL,data TEXT NOT NULL)')
 
 def market_cache_read(key):
@@ -222,6 +231,8 @@ class Handler(BaseHTTPRequestHandler):
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8'),'/market_dashboard.js':('market_dashboard.js','text/javascript; charset=utf-8'),'/market_dashboard.css':('market_dashboard.css','text/css; charset=utf-8'),'/market_intelligence.js':('market_intelligence.js','text/javascript; charset=utf-8'),'/trade_chart_markers.js':('trade_chart_markers.js','text/javascript; charset=utf-8'),'/market_intelligence.css':('market_intelligence.css','text/css; charset=utf-8')}
+  for filename in ('coin_alerts.js','experience_ui.js','chart_tools.js','experience_ui.css','chart_tools.css'):
+   static['/'+filename]=(filename,('text/javascript' if filename.endswith('.js') else 'text/css')+'; charset=utf-8')
   if self.path in static:
    filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
    if filename=='index.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
@@ -233,7 +244,7 @@ class Handler(BaseHTTPRequestHandler):
    rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=? ORDER BY date,id',(uid,))]
    prices={r['symbol']:r['price'] for r in c.execute('SELECT * FROM prices WHERE user_id=?',(uid,))}
    records,statuses=history_state(c,uid)
-   self.send(200,dict(**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=rows,assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
+   self.send(200,dict(**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=rows,assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
  def do_POST(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   origin=self.headers.get('Origin')
@@ -244,7 +255,8 @@ class Handler(BaseHTTPRequestHandler):
   try:
    length=int(self.headers.get('Content-Length',0))
    if length<=0 or length>1000000: raise ValueError('Upload must be under 1 MB')
-   raw=json.loads(self.rfile.read(length))
+   try:raw=json.loads(self.rfile.read(length))
+   except RecursionError:raise ValueError('JSON nesting is too deep') from None
    if not isinstance(raw,dict): raise ValueError('JSON object required')
    with connect() as c:
     if self.path in ('/api/register','/api/login'):
@@ -258,6 +270,11 @@ class Handler(BaseHTTPRequestHandler):
       try: c.execute('INSERT INTO users(email,password) VALUES (?,?)',(email,password(pw)))
       except sqlite3.IntegrityError: raise ValueError('Account already exists')
      row=c.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone()
+     if row:
+      c.commit()
+      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(row['id'],))
+      else:c.execute('BEGIN IMMEDIATE')
+      row=c.execute('SELECT * FROM users WHERE id=?',(row['id'],)).fetchone()
      verified=password(pw,row['password'].split(':')[0] if row else DUMMY_SALT)
      if not row or not hmac.compare_digest(verified,row['password']): raise ValueError('Incorrect email or password')
      c.execute('DELETE FROM sessions WHERE expires<=?',(time.time(),))
@@ -267,7 +284,7 @@ class Handler(BaseHTTPRequestHandler):
     uid=self.user(c)
     if not uid: self.send(401,{'error':'Sign in to continue'}); return
     market_action=self.path in ('/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news','/api/intelligence-overview','/api/intelligence-narrative','/api/intelligence-rsi','/api/intelligence-venues','/api/intelligence-flow','/api/intelligence-derivatives','/api/intelligence-exposures')
-    if market_action:budget=__import__('cloud_storage').provider_action(uid,kind='market',limit=60) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)
+    if market_action:budget=__import__('cloud_storage').provider_action(uid,kind='market',limit=60,max_concurrent=4) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)
     else:budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens','/api/market-watch-toggle') else nullcontext()
     with budget, providers.deadline(time.monotonic()+30):
      if market_action:
@@ -290,6 +307,36 @@ class Handler(BaseHTTPRequestHandler):
        elif self.path=='/api/intelligence-derivatives':result=market_microstructure.derivatives(raw.get('coin_id'))
        else:result=protocol_data.fundamentals(raw.get('coin_id'))
       self.send(200,result);return
+     if self.path=='/api/coin-alert-list':self.send(200,coin_alerts.state(c,uid,raw.get('coin_id')));return
+     if self.path in ('/api/coin-alert-save','/api/coin-alert-check','/api/coin-alert-delete'):
+      prepared=None
+      if self.path!='/api/coin-alert-delete':
+       c.commit()
+       with (__import__('cloud_storage').provider_action(uid,kind='market',limit=60,max_concurrent=4) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)),coin_market.persistence(market_cache_read,market_cache_write):prepared=coin_market.detail(raw.get('coin_id'))
+      c.commit()
+      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+      else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      if self.path=='/api/coin-alert-save':coin_alerts.save(c,uid,raw,prepared);result=coin_alerts.state(c,uid,raw.get('coin_id'))
+      elif self.path=='/api/coin-alert-check':result=coin_alerts.evaluate(c,uid,prepared)
+      else:result=coin_alerts.remove(c,uid,raw)
+      c.commit();self.send(200,result);return
+     if self.path in ('/api/profile','/api/learning-notes','/api/exchange-state','/api/chart-setup-load'):
+      result={'/api/profile':lambda:account_features.state(c,uid),'/api/learning-notes':lambda:account_features.notes(c,uid),'/api/exchange-state':lambda:exchange_connections.state(c,uid),'/api/chart-setup-load':lambda:workspace_features.load(c,uid,raw)}[self.path]()
+      self.send(200,result);return
+     if self.path in ('/api/profile-save','/api/password-change','/api/learning-note-save','/api/learning-note-delete','/api/exchange-connect','/api/exchange-sync','/api/exchange-delete','/api/chart-setup-save'):
+      if self.path=='/api/password-change' and not allow_auth('password:'+str(uid)):self.send(429,{'error':'Too many password attempts. Retry later.'});return
+      prepared=None
+      if self.path in ('/api/exchange-connect','/api/exchange-sync'):
+       c.commit()
+       with (__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)),coin_market.persistence(market_cache_read,market_cache_write):
+        prepared=exchange_connections.prepare(raw) if self.path=='/api/exchange-connect' else exchange_connections.sync_prepare(c,uid,raw)
+       c.commit()
+      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+      else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      actions={'/api/profile-save':lambda:account_features.save_profile(c,uid,raw),'/api/password-change':lambda:account_features.change_password(c,uid,raw),'/api/learning-note-save':lambda:account_features.save_note(c,uid,raw),'/api/learning-note-delete':lambda:account_features.delete_note(c,uid,raw),'/api/exchange-connect':lambda:exchange_connections.add(c,uid,prepared),'/api/exchange-sync':lambda:exchange_connections.sync_save(c,uid,*prepared),'/api/exchange-delete':lambda:exchange_connections.delete(c,uid,raw),'/api/chart-setup-save':lambda:workspace_features.save(c,uid,raw)}
+      result=actions[self.path]();c.commit();self.send(200,result);return
      if self.path=='/api/market-watchlist':self.send(200,market_watch.state(c,uid));return
      prepared_watch=None
      if self.path=='/api/market-watch-toggle':
@@ -434,7 +481,16 @@ class Handler(BaseHTTPRequestHandler):
      elif self.path=='/api/price':
       c.execute('INSERT OR REPLACE INTO prices VALUES (?,?,?)',(uid,symbol_value(raw['symbol']),str(number(raw['price']))))
       c.execute('INSERT OR REPLACE INTO price_metadata VALUES (?,?,?,?)',(uid,symbol_value(raw['symbol']),'Manual',int(time.time())))
+     elif self.path=='/api/wallet-batch':
+      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+      else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      result=wallet_batch.add(c,uid,raw);c.commit();self.send(200,result);return
      elif self.path=='/api/wallet':
+      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+      else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      if c.execute('SELECT COUNT(*) AS n FROM wallets WHERE user_id=?',(uid,)).fetchone()['n']>=50:raise ValueError('Maximum 50 connected addresses per account')
       chain=raw['chain']; address=providers.validate_address(chain,raw['address'])
       if chain not in providers.CHAINS or not 20<=len(address)<=100: raise ValueError('Choose a chain and enter a public address')
       c.execute('INSERT INTO wallets(user_id,chain,address,label) VALUES (?,?,?,?)',(uid,chain,address,str(raw.get('label','Wallet'))[:100]))
