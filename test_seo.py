@@ -29,7 +29,7 @@ class SEOTests(unittest.TestCase):
  def test_private_workspace_is_noindex_but_guides_crawlable(self):
   source=(ROOT/'app.html').read_text(encoding='utf-8')
   self.assertIn('content="noindex,follow"',source)
-  self.assertIn('/crypto-portfolio-tracker.html',source)
+  self.assertIn('href="/">About the crypto portfolio tracker',source)
   robots=(ROOT/'robots.txt').read_text()
   self.assertIn('Sitemap: '+BASE+'/sitemap.xml',robots)
   self.assertNotIn('Disallow: /',robots)
@@ -59,4 +59,22 @@ class SEOTests(unittest.TestCase):
    self.assertNotIn('app.js',source)
    self.assertIn('public_site.css',source)
   self.assertLess((ROOT/'public_site.css').stat().st_size,6000)
+ def test_icons_present_on_public_and_private_pages(self):
+  for name in ('index.html','app.html','about-orbit.html','guides/wallet-tracking.html','guides/crypto-profit-loss.html'):
+   source=(ROOT/name).read_text(encoding='utf-8')
+   for icon in ('/favicon.ico','/favicon.svg','/favicon-96.png','/apple-touch-icon.png'):
+    self.assertIn('href="'+icon+'"',source)
+    self.assertIn(icon,STATIC_FILES)
+  self.assertEqual((ROOT/'favicon.ico').read_bytes()[:4],b'\x00\x00\x01\x00')
+ def test_public_build_removes_blocking_css_request(self):
+  import tempfile
+  from build_static import build
+  with tempfile.TemporaryDirectory() as directory:
+   build(directory)
+   for name in ('index.html','guides/wallet-tracking.html','guides/crypto-profit-loss.html','about-orbit.html'):
+    source=Path(directory,name).read_text(encoding='utf-8')
+    self.assertIn('<style>',source)
+    self.assertNotIn('rel="stylesheet"',source)
+    self.assertNotIn('<script',source)
+   self.assertIn('rel="stylesheet"',Path(directory,'app.html').read_text(encoding='utf-8'))
 if __name__=='__main__':unittest.main()

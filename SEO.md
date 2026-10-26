@@ -43,3 +43,11 @@ Additional primary research:
 - Canonicalization and redirect signals: https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls
 
 No Search Console ownership or field Core Web Vitals data has been provided. These implementation checks are not a Lighthouse score, a rich-results validation, an indexing guarantee or measured ranking improvement.
+
+## Supplied Lighthouse report follow-up
+
+The user-provided download.pdf (39 pages, captured 26 October 2026) reports performance 61, accessibility 91, best practices 92 and SEO 100. It explicitly warns that browser extensions and IndexedDB affect this run. Page 11 identifies unnamed controls and positive tabindex in extension-injected chat UI; pages 3–8 attribute substantial JavaScript activity to extension URLs. Page 20 reports extension messaging errors. Those findings should not be treated as proof that Orbit ships the extension scripts or that all reported CPU time belongs to Orbit.
+
+The actionable first-party rendering dependency is /public_site.css. Production public HTML now inlines this small stylesheet, eliminating its blocking request without JavaScript, remote fonts or weaker CSP. A visible keyboard focus style is included. The private application's styles and scripts remain unchanged.
+
+SVG, multi-resolution ICO, 96px PNG and Apple touch icons are linked from public and private pages. Icons have explicit allowlisted static routes and MIME types. New scores have not been claimed; repeat Lighthouse in a clean browser profile with extensions disabled to compare.

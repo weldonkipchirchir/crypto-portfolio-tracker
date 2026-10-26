@@ -8,6 +8,10 @@ def build(destination=None):
  destination.mkdir(parents=True,exist_ok=True)
  for filename,kind in STATIC_FILES.values():
   body=(ROOT/filename).read_bytes()
+  if kind.startswith('text/html') and filename!='app.html':
+   # The public stylesheet is tiny: inline it to remove the blocking CSS round trip.
+   css=(ROOT/'public_site.css').read_bytes()
+   body=body.replace(b'<link rel="stylesheet" href="/public_site.css">',b'<style>'+css+b'</style>')
   if filename=='app.html':
    for old,new in ((b'Local development edition',b'Personal cloud edition'),(b'Local workspace',b'Cloud workspace'),(b'Private local accounts',b'Private cloud accounts'),(b'Development edition',b'Personal preview')):body=body.replace(old,new)
   (destination/filename).parent.mkdir(parents=True,exist_ok=True)
