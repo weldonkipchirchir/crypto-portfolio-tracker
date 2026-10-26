@@ -1,5 +1,5 @@
 """Encrypted, read-only Binance spot snapshots. Never places orders or transfers."""
-import base64,hashlib,hmac,json,os,re,secrets,time,urllib.request,urllib.error
+import base64,hashlib,hmac,json,os,re,secrets,time,unicodedata,urllib.request,urllib.error
 from urllib.parse import urlencode
 from decimal import Decimal,InvalidOperation,localcontext
 import providers
@@ -73,7 +73,9 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def signed(path,key,secret):
  if path not in PATHS:raise ValueError('Unsupported exchange operation')
- query=urlencode({'timestamp':int(time.time()*1000),'recvWindow':5000})
+ params={'timestamp':int(time.time()*1000),'recvWindow':5000}
+ if path==PATHS[1]:params['omitZeroBalances']='true'
+ query=urlencode(params)
  signature=hmac.new(secret.encode(),query.encode(),hashlib.sha256).hexdigest()
  req=urllib.request.Request('https://api.binance.com'+path+'?'+query+'&signature='+signature,headers={'X-MBX-APIKEY':key,'User-Agent':'OrbitPortfolio/1.0'})
  cutoff=getattr(providers._REQUEST_CONTEXT,'cutoff',None);timeout=min(10,cutoff-time.monotonic()) if cutoff else 10
@@ -101,25 +103,34 @@ def snapshot(key,secret):
  if any(x not in permissions or type(permissions[x]) is not bool for x in PERMISSIONS):raise ValueError('Binance did not provide all permission flags. This key cannot be verified as read-only; reconnect a standard Binance HMAC key.')
  if any(permissions[x] for x in PERMISSIONS) or any((type(v) is not bool or v is True) and k.startswith(('enable','permits')) and k not in ('enableReading','enableFixReadOnly') for k,v in permissions.items()):raise ValueError('Use a reading-only key. Disable trading, withdrawals, margin, futures, options and transfers.')
  account=signed(PATHS[1],key,secret)
- if not isinstance(account,dict):raise ValueError('Invalid Binance balance response')
+ if not isinstance(account,dict):raise ValueError('Invalid Binance balance response (BALANCE_OBJECT)')
  rows=account.get('balances')
- if not isinstance(rows,list) or len(rows)>5000:raise ValueError('Invalid Binance balance response')
+ if not isinstance(rows,list) or len(rows)>5000:raise ValueError('Invalid Binance balance response (BALANCE_LIST)')
  balances=[];seen=set()
  for row in rows:
+  reason='BALANCE_ROW'
   try:
-   asset=row['asset']
-   if not all(isinstance(row[k],str) and len(row[k])<=80 for k in ('free','locked')):raise ValueError()
+   if not isinstance(row,dict):raise ValueError()
+   reason='BALANCE_AMOUNT'
+   if not all(isinstance(row.get(k),str) and 0<len(row[k])<=80 for k in ('free','locked')):raise ValueError()
    free=Decimal(row['free']);locked=Decimal(row['locked'])
-   if not isinstance(asset,str) or not re.fullmatch(r'[A-Z0-9]{1,30}',asset) or not all(n.is_finite() and n>=0 and n.adjusted()<=30 and n.as_tuple().exponent>=-30 for n in (free,locked)):raise ValueError()
-   if asset in seen:raise ValueError()
-   seen.add(asset)
-   # Keep every accepted digit: Decimal's default 28-digit context can
-   # silently round even ordinary tokens with large supplies and 18 decimals.
+   if not all(n.is_finite() and n>=0 and n.adjusted()<=30 and n.as_tuple().exponent>=-30 for n in (free,locked)):raise ValueError()
    with localcontext() as context:
     context.prec=128
     quantity=free+locked
-   if quantity:balances.append({'asset':asset,'free':str(free),'locked':str(locked),'quantity':str(quantity)})
-  except (ValueError,KeyError,TypeError,InvalidOperation):raise ValueError('Invalid Binance balance response') from None
+   # Binance may return zero rows despite the requested filter. No asset
+   # metadata is needed for a zero position; it must not reject real holdings.
+   if not quantity:continue
+   reason='BALANCE_ASSET'
+   asset=row.get('asset')
+   # Preserve the exact exchange identity. Never normalize it into a priced
+   # known symbol; unfamiliar names remain unpriced. Exclude controls/markup.
+   if not isinstance(asset,str) or not 1<=len(asset)<=64 or not all(unicodedata.category(ch)[0] in ('L','N') or ch in '_.-' for ch in asset):raise ValueError()
+   reason='BALANCE_DUPLICATE'
+   if asset in seen:raise ValueError()
+   seen.add(asset)
+   balances.append({'asset':asset,'free':str(free),'locked':str(locked),'quantity':str(quantity)})
+  except (ValueError,KeyError,TypeError,InvalidOperation):raise ValueError('Invalid Binance balance response ('+reason+')') from None
  # Curated exchange asset IDs only. Unknown symbols remain explicitly unpriced.
  identities={symbol:identity for identity,symbol in exchange_charts.ASSETS.items()};identities.update(USDC='usd-coin',USDT='tether',BNB='binancecoin')
  try:quotes={r['id']:r for r in coin_market.listings()['coins']}

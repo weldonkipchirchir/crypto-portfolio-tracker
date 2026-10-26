@@ -47,6 +47,20 @@ class AccountFeaturesTests(unittest.TestCase):
    with patch.object(e,'signed',return_value={**permissions,'enableWithdrawals':value}),self.assertRaisesRegex(ValueError,'all permission flags'):e.snapshot('a','b')
   del permissions['enableWithdrawals']
   with patch.object(e,'signed',return_value=permissions),self.assertRaises(ValueError):e.snapshot('a','b')
+ def test_binance_extended_asset_names_and_zero_catalog(self):
+  permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
+  account={'balances':[{'asset':'legacy-unused!','free':'0.00000000','locked':'0'},{'asset':'BTC','free':'0.25','locked':'0'},{'asset':'币安人生','free':'123.456','locked':'0'},{'asset':'LDUSDT','free':'1','locked':'0'},{'asset':'token.v2-test','free':'2','locked':'0'}]}
+  with patch.object(e,'signed',side_effect=[permissions,account]),patch.object(e.coin_market,'listings',return_value={'coins':[]}):
+   balances=e.snapshot('fake-key','fake-secret')['balances']
+  self.assertEqual([r['asset'] for r in balances],['BTC','币安人生','LDUSDT','token.v2-test'])
+  self.assertEqual(balances[1]['quantity'],'123.456');self.assertIsNone(balances[1]['coin_id']);self.assertIsNone(balances[1]['value_usd'])
+  for asset in ['<script>','BTC\u202e',' BTC','USDT\n','a'*65]:
+   with patch.object(e,'signed',side_effect=[permissions,{'balances':[{'asset':asset,'free':'1','locked':'0'}]}]),self.assertRaisesRegex(ValueError,'BALANCE_ASSET') as error:e.snapshot('fake-key','fake-secret')
+   self.assertNotIn(asset,str(error.exception));self.assertNotIn('fake-secret',str(error.exception))
+ def test_binance_safe_diagnostic_codes(self):
+  permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
+  for rows,code in [(None,'BALANCE_LIST'),([False],'BALANCE_ROW'),([{'asset':'BTC','free':'NaN','locked':'0'}],'BALANCE_AMOUNT'),([{'asset':'BTC','free':'1','locked':'0'}]*2,'BALANCE_DUPLICATE')]:
+   with patch.object(e,'signed',side_effect=[permissions,{'balances':rows}]),self.assertRaisesRegex(ValueError,code):e.snapshot('fake-key','fake-secret')
  def test_malformed_balances(self):
   permissions={x:False for x in e.PERMISSIONS};permissions['enableReading']=True
   for amount in ['NaN','Infinity','-1','1e99']:
@@ -78,7 +92,7 @@ class AccountFeaturesTests(unittest.TestCase):
    factory.return_value.open.return_value=Response()
    result=e.signed('/api/v3/account','private-key','private-secret')
    req=factory.return_value.open.call_args.args[0]
-   self.assertTrue(req.full_url.startswith('https://api.binance.com/api/v3/account?timestamp=123456&recvWindow=5000&signature='))
+   self.assertTrue(req.full_url.startswith('https://api.binance.com/api/v3/account?timestamp=123456&recvWindow=5000&omitZeroBalances=true&signature='))
    self.assertNotIn('private-secret',req.full_url)
    self.assertEqual(result,{'balances':[]})
   with patch.object(e.urllib.request,'build_opener') as factory:
