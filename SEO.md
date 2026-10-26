@@ -55,3 +55,25 @@ SVG, multi-resolution ICO, 96px PNG and Apple touch icons are linked from public
 ## Public registration release
 
 Public registration is explicitly enabled by ORBIT_PUBLIC_REGISTRATION=1 in production. Account creation links open /app.html#create-account. The build replaces the earlier owner-only product copy and sets the registration metadata to public. Authentication, per-account authorization, password minimums and rate limits remain active. Registration defaults remain restricted when an owner email is configured and the public flag is absent.
+
+## Agent-reviewed topic cluster
+
+These are qualitative topic hypotheses based on shipped workflows, not search-volume estimates or confirmed ranking opportunities:
+
+| Public page | Main reader task | Content added |
+| --- | --- | --- |
+| / | Multi-chain crypto portfolio tracking | Clear supported-network scope, recorded-trade P&L and account requirement near CTA |
+| /guides/wallet-tracking.html | Track MetaMask/Trust Wallet public addresses across networks | Multi-network selection workflow, wallet vs token identity, missing-value troubleshooting |
+| /guides/crypto-profit-loss.html | Understand weighted-average crypto cost basis | Fee formulas, gross lifetime average price vs remaining cost, partial sale example, missing acquisition errors |
+| /guides/import-crypto-trades-csv.html | Import crypto trade records with fees | Actual supported columns, downloadable CSV, preview workflow, normalized duplicates and validation limits |
+
+The CSV is tested through imports.preview and server.calculate. It produces 340 USD realized P&L, 1.5 ETH remaining, 3765 USD remaining cost, 2500 average gross purchase price and 3200 average gross sale price. No live price, tax treatment or investment return is inferred.
+
+The source homepage/About copy now describes the account requirement directly, avoiding dependence on production-only text replacements. Public registration remains enabled in production. Search Console verification has not yet been completed; submit the updated five-page sitemap after verification.
+
+Agent research used Google title-link and helpful-content guidance plus competitor product documentation to identify common user tasks. Orbit's accounting explanations are derived from its own implementation, not a competitor's methodology:
+- https://developers.google.com/search/docs/appearance/title-link
+- https://developers.google.com/search/docs/fundamentals/creating-helpful-content
+- https://help.coinstats.app/en/articles/3621267-portfolio-analytics
+- https://help.coinstats.app/en/articles/13002805-profit-loss-p-l-faqs
+- https://coinmarketcap.com/academy/article/how-to-use-the-coinmarketcap-portfolio

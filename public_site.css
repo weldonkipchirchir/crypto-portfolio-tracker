@@ -2,3 +2,5 @@
 a:focus-visible{outline:3px solid #c4ffe6;outline-offset:5px;border-radius:3px}.skip:focus{z-index:10}
 
 .auth-create-link{background:transparent;color:#87dfbc;border:1px solid #87dfbc}
+
+.guide-table{overflow-x:auto}pre{overflow-x:auto;padding:20px;border:1px solid #31463f;border-radius:12px;background:#192923;font-size:13px;line-height:1.7}td:first-child{font-weight:650}

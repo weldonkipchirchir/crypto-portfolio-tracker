@@ -10,7 +10,7 @@ class Page(HTMLParser):
 class SEOTests(unittest.TestCase):
  def test_sitemap_pages_have_unique_titles_descriptions_and_canonicals(self):
   sitemap=ET.fromstring((ROOT/'sitemap.xml').read_text());urls=[node.text for node in sitemap.findall('{*}url/{*}loc')]
-  self.assertEqual(len(urls),4);titles=set();descriptions=set()
+  self.assertEqual(len(urls),5);titles=set();descriptions=set()
   for url in urls:
    self.assertTrue(url.startswith(BASE+'/'));path=url[len(BASE):];filename,kind=STATIC_FILES[path]
    source=(ROOT/filename).read_text(encoding='utf-8');page=Page(source)
@@ -77,4 +77,23 @@ class SEOTests(unittest.TestCase):
     self.assertNotIn('rel="stylesheet"',source)
     self.assertNotIn('<script',source)
    self.assertIn('rel="stylesheet"',Path(directory,'app.html').read_text(encoding='utf-8'))
+ def test_csv_example_matches_documented_accounting(self):
+  import imports,server
+  result=imports.preview((ROOT/'examples/orbit-trades.csv').read_text(),[],server.trade,server.calculate)
+  self.assertEqual(result['errors'],[])
+  self.assertEqual(result['count'],3)
+  rows=[dict(t,id=i) for i,t in enumerate(result['trades'])]
+  asset=server.calculate(rows,{'ETH':'3000'})[0]
+  self.assertEqual(asset['realized'],340)
+  self.assertEqual(asset['quantity'],1.5)
+  self.assertEqual(asset['cost'],3765)
+  self.assertEqual(asset['average_buy'],2500)
+  self.assertEqual(asset['average_sell'],3200)
+ def test_account_requirement_and_specific_topics(self):
+  home=(ROOT/'index.html').read_text(encoding='utf-8')
+  self.assertIn('Multi-Chain Crypto Portfolio Tracker',home)
+  self.assertIn('An account is required',home)
+  self.assertIn('/guides/import-crypto-trades-csv.html',home)
+  for name in ('index.html','about-orbit.html'):
+   self.assertNotIn('restricted to the deployment owner',(ROOT/name).read_text(encoding='utf-8'))
 if __name__=='__main__':unittest.main()
