@@ -51,3 +51,7 @@ The user-provided download.pdf (39 pages, captured 26 October 2026) reports perf
 The actionable first-party rendering dependency is /public_site.css. Production public HTML now inlines this small stylesheet, eliminating its blocking request without JavaScript, remote fonts or weaker CSP. A visible keyboard focus style is included. The private application's styles and scripts remain unchanged.
 
 SVG, multi-resolution ICO, 96px PNG and Apple touch icons are linked from public and private pages. Icons have explicit allowlisted static routes and MIME types. New scores have not been claimed; repeat Lighthouse in a clean browser profile with extensions disabled to compare.
+
+## Public registration release
+
+Public registration is explicitly enabled by ORBIT_PUBLIC_REGISTRATION=1 in production. Account creation links open /app.html#create-account. The build replaces the earlier owner-only product copy and sets the registration metadata to public. Authentication, per-account authorization, password minimums and rate limits remain active. Registration defaults remain restricted when an owner email is configured and the public flag is absent.

@@ -266,7 +266,7 @@ class Handler(BaseHTTPRequestHandler):
      if '@' not in email or len(pw)<12: raise ValueError('Use an email and a password of at least 12 characters')
      if self.path=='/api/register':
       allowed_email=os.environ.get('ORBIT_REGISTRATION_EMAIL','').strip().lower()
-      if allowed_email and email!=allowed_email:raise ValueError('Registration is restricted on this deployment')
+      if os.environ.get('ORBIT_PUBLIC_REGISTRATION')!='1' and allowed_email and email!=allowed_email:raise ValueError('Registration is restricted on this deployment')
       try: c.execute('INSERT INTO users(email,password) VALUES (?,?)',(email,password(pw)))
       except sqlite3.IntegrityError: raise ValueError('Account already exists')
      row=c.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone()

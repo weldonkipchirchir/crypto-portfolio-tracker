@@ -25,7 +25,7 @@ class SEOTests(unittest.TestCase):
    self.assertNotIn('<script',source)
    for tag,attrs in page.tags:
     if tag=='a' and attrs.get('href','').startswith('/'):
-     self.assertIn(attrs['href'],STATIC_FILES)
+     self.assertIn(attrs['href'].split('#',1)[0],STATIC_FILES)
  def test_private_workspace_is_noindex_but_guides_crawlable(self):
   source=(ROOT/'app.html').read_text(encoding='utf-8')
   self.assertIn('content="noindex,follow"',source)

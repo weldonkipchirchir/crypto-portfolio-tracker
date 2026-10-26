@@ -10,7 +10,7 @@ def initialize():
   if _ready:return
   if not os.environ.get('DATABASE_URL'):raise RuntimeError('DATABASE_URL is required')
   if os.environ.get('ORBIT_SECURE_COOKIE')!='1':raise RuntimeError('HTTPS session cookies must be enabled')
-  if not os.environ.get('ORBIT_REGISTRATION_EMAIL'):raise RuntimeError('Set the owner registration email')
+  if os.environ.get('ORBIT_PUBLIC_REGISTRATION')!='1' and not os.environ.get('ORBIT_REGISTRATION_EMAIL'):raise RuntimeError('Set the owner registration email')
   init();cloud_storage.initialize_limits();_ready=True
 class handler(Handler):
  def end_headers(self):

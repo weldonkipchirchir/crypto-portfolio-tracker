@@ -38,3 +38,11 @@
 .market-intervals{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}.market-intervals button[aria-pressed=true]{background:var(--green);color:#172515}.market-intervals button{font-size:12px;padding:9px 15px}
 
 .market-quote-strip{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:10px 12px;margin:10px 0;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted)}.market-quote-strip b{color:var(--text)}.market-quote-strip button{margin-left:auto}
+
+:root[data-theme="light"] .market-chart-scroll,:root[data-theme="light"] .market-chart{background:#fff;color:#192b38}
+:root[data-theme="light"] .market-chart text{fill:#506574}
+:root[data-theme="light"] .market-chart .market-gridline{stroke:#dbe3e9}
+:root[data-theme="light"] .market-chart .market-crosshair{stroke:#8297a5}
+:root[data-theme="light"] .market-stats>div{background:linear-gradient(145deg,#fff,#edf5f0)}
+:root[data-theme="light"] .market-quote-strip{background:#f4f7fa;color:#526773}
+:root[data-theme="light"] .market-quote-strip b{color:#192b38}
