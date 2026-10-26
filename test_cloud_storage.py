@@ -27,6 +27,12 @@ class CloudTests(base.APITests):
   self.owned_wallet=lambda:test_targets_api.TargetsAPITests.owned_wallet(self)
   try:test_targets_api.TargetsAPITests.test_price_refresh_evaluates_without_duplicates(self)
   finally:self.owned_wallet=original
+ def test_research_auth_routes(self):
+  import test_research_api
+  test_research_api.ResearchAPITests.test_research_routes_and_auth(self)
+ def test_market_watch_account_scope(self):
+  import test_research_api
+  test_research_api.ResearchAPITests.test_watchlist_accounts_and_remove_without_network(self)
  def test_markets_auth_routes(self):
   import test_markets_api
   test_markets_api.MarketsAPITests.test_authentication_and_routes(self)

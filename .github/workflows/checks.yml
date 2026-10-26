@@ -28,3 +28,4 @@ jobs:
       - run: node advanced_dashboard.test.cjs
       - run: node target_dashboard.test.cjs
       - run: node market_dashboard.test.cjs
+      - run: node market_intelligence.test.cjs

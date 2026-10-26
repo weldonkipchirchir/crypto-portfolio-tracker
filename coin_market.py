@@ -122,7 +122,11 @@ def listings(force=False):
 
 def allowed(coin_id):
  identity=identifier(coin_id)
- if not any(c['id']==identity for c in listings()['coins']):raise ValueError('Choose a coin from the market listings')
+ try:known=any(c['id']==identity for c in listings()['coins'])
+ except ValueError:known=False
+ if not known:
+  import market_intelligence
+  if not market_intelligence.catalog_coin(identity):raise ValueError('Choose a coin from the market listings or a recently loaded narrative')
  return identity
 
 def detail(coin_id):

@@ -85,3 +85,6 @@ Targets adds recurring inclusive price conditions and an account event history, 
 
 ## Top-ranked coin markets
 Markets loads up to 250 CoinGecko market-cap-ranked coins with search, sorting and pagination. Coin pages include real historical USD charts, supply, cap/FDV, volume and exact-ID-matched DefiLlama protocol revenue. Unlock summaries require an existing DEFILLAMA_API_KEY API subscription; missing schedules are never inferred from supply. See MARKETS.md for provider setup, provenance, caching and limits.
+
+
+Market research: see [RESEARCH.md](RESEARCH.md) for sentiment, narratives, RSI, exchange structure, funding/open interest, watchlists and recorded trade overlays, including public-feed coverage limits.

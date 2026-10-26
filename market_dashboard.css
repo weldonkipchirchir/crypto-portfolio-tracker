@@ -31,3 +31,4 @@
 .market-zoom p{font-size:10px;color:#b6c5b9}
 @media(max-width:900px){.market-detail-layout>section:last-child .market-detail-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:650px){.market-detail-layout>section:last-child .market-detail-stats{grid-template-columns:minmax(0,1fr)}.market-inspection{padding:12px}.market-source-row{display:grid;grid-template-columns:80px minmax(0,1fr);gap:10px}.market-source-badge{grid-column:1/-1}.market-panel-head{gap:10px}}
+.market-fill circle{stroke:#152319;stroke-width:2;fill:#c3f36b}.market-fill.sell circle{fill:#f08d88}.market-chart .market-fill text{font:700 11px system-ui;fill:#122216;pointer-events:none}.market-fill:focus circle{stroke:white;stroke-width:3}

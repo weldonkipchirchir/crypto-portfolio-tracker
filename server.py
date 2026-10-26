@@ -9,6 +9,9 @@ import price_targets
 import coin_market
 import protocol_data
 import market_news
+import market_intelligence
+import market_microstructure
+import market_watch
 import exchange_charts
 import history
 import review
@@ -64,6 +67,7 @@ def init():
   c.executescript('''CREATE TABLE IF NOT EXISTS price_metadata(user_id INTEGER,symbol TEXT,source TEXT,updated_at INTEGER,PRIMARY KEY(user_id,symbol)); CREATE TABLE IF NOT EXISTS wallet_snapshots(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS wallet_tokens(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS token_watchlist(wallet_id INTEGER PRIMARY KEY,contracts TEXT); CREATE TABLE IF NOT EXISTS imports(user_id INTEGER,digest TEXT,PRIMARY KEY(user_id,digest)); CREATE TABLE IF NOT EXISTS chain_history(wallet_id INTEGER,event_id TEXT,data TEXT,PRIMARY KEY(wallet_id,event_id)); CREATE TABLE IF NOT EXISTS history_sync(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS review_decisions(user_id INTEGER,review_id TEXT,status TEXT,data TEXT,PRIMARY KEY(user_id,review_id)); CREATE TABLE IF NOT EXISTS asset_bindings(user_id INTEGER,asset_id TEXT,symbol TEXT,PRIMARY KEY(user_id,asset_id),UNIQUE(user_id,symbol));''')
   advanced_portfolio.init(c)
   price_targets.init(c)
+  market_watch.init(c)
   c.execute('CREATE TABLE IF NOT EXISTS coin_market_cache (key TEXT PRIMARY KEY,fetched_at INTEGER NOT NULL,data TEXT NOT NULL)')
 
 def market_cache_read(key):
@@ -217,7 +221,7 @@ class Handler(BaseHTTPRequestHandler):
   return row[0] if row else None
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
-  static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8'),'/market_dashboard.js':('market_dashboard.js','text/javascript; charset=utf-8'),'/market_dashboard.css':('market_dashboard.css','text/css; charset=utf-8')}
+  static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8'),'/market_dashboard.js':('market_dashboard.js','text/javascript; charset=utf-8'),'/market_dashboard.css':('market_dashboard.css','text/css; charset=utf-8'),'/market_intelligence.js':('market_intelligence.js','text/javascript; charset=utf-8'),'/trade_chart_markers.js':('trade_chart_markers.js','text/javascript; charset=utf-8'),'/market_intelligence.css':('market_intelligence.css','text/css; charset=utf-8')}
   if self.path in static:
    filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
    if filename=='index.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
@@ -262,14 +266,14 @@ class Handler(BaseHTTPRequestHandler):
      self.send_response(200); self.send_header('Set-Cookie','session='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400'+('; Secure' if os.environ.get('ORBIT_SECURE_COOKIE')=='1' else '')); self.send_header('Content-Type','application/json'); self.end_headers(); self.wfile.write(b'{"ok":true}'); return
     uid=self.user(c)
     if not uid: self.send(401,{'error':'Sign in to continue'}); return
-    market_action=self.path in ('/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news')
+    market_action=self.path in ('/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news','/api/intelligence-overview','/api/intelligence-narrative','/api/intelligence-rsi','/api/intelligence-venues','/api/intelligence-flow','/api/intelligence-derivatives','/api/intelligence-exposures')
     if market_action:budget=__import__('cloud_storage').provider_action(uid,kind='market',limit=60) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)
-    else:budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens') else nullcontext()
+    else:budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens','/api/market-watch-toggle') else nullcontext()
     with budget, providers.deadline(time.monotonic()+30):
      if market_action:
       c.commit()
       with coin_market.persistence(market_cache_read,market_cache_write):
-       if self.path=='/api/market-listings':result=coin_market.listings()
+       if self.path=='/api/market-listings':result={**coin_market.listings(),'exchange_coin_ids':sorted(exchange_charts.ASSETS)}
        elif self.path=='/api/market-detail':result=coin_market.detail(raw.get('coin_id'))
        elif self.path=='/api/market-chart':
         source=raw.get('source','coingecko')
@@ -277,11 +281,27 @@ class Handler(BaseHTTPRequestHandler):
         elif source in ('binance','coinbase'):result=exchange_charts.chart(raw.get('coin_id'),raw.get('days',30),raw.get('kind','line'),source)
         else:raise ValueError('Choose CoinGecko, Binance or Coinbase chart data')
        elif self.path=='/api/market-news':result=market_news.news(raw.get('coin_id'))
+       elif self.path=='/api/intelligence-overview':result=market_intelligence.overview()
+       elif self.path=='/api/intelligence-narrative':result=market_intelligence.narratives(raw.get('slug','rwa'))
+       elif self.path=='/api/intelligence-rsi':result=market_intelligence.rsi()
+       elif self.path=='/api/intelligence-venues':result=market_intelligence.venues(raw.get('coin_id'))
+       elif self.path=='/api/intelligence-flow':result=market_microstructure.microstructure(raw.get('coin_id'))
+       elif self.path=='/api/intelligence-exposures':result=market_microstructure.exposures(raw.get('coin_id'))
+       elif self.path=='/api/intelligence-derivatives':result=market_microstructure.derivatives(raw.get('coin_id'))
        else:result=protocol_data.fundamentals(raw.get('coin_id'))
       self.send(200,result);return
-     if self.path in ('/api/trade','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove'):
+     if self.path=='/api/market-watchlist':self.send(200,market_watch.state(c,uid));return
+     prepared_watch=None
+     if self.path=='/api/market-watch-toggle':
+      identity=coin_market.identifier(raw.get('coin_id'))
+      exists=c.execute('SELECT coin_id FROM market_favorites WHERE user_id=? AND coin_id=?',(uid,identity)).fetchone();c.commit()
+      if not exists:
+       with coin_market.persistence(market_cache_read,market_cache_write):prepared_watch=market_watch.resolve(identity)
+     if self.path in ('/api/trade','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove','/api/market-watch-toggle'):
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')
+     if self.path=='/api/market-watch-toggle':
+      result=market_watch.toggle(c,uid,raw,prepared_watch);c.commit();self.send(200,result);return
      if self.path=='/api/target-save':
       wallets=snapshots(c,uid);quotes=metadata(c,uid)
       target=price_targets.save(c,uid,raw,wallets,quotes)
