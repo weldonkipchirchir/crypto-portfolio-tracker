@@ -10,5 +10,6 @@ def build(destination=None):
   body=(ROOT/filename).read_bytes()
   if filename=='index.html':
    for old,new in ((b'Local development edition',b'Personal cloud edition'),(b'Local workspace',b'Cloud workspace'),(b'Private local accounts',b'Private cloud accounts'),(b'Development edition',b'Personal preview')):body=body.replace(old,new)
+  (destination/filename).parent.mkdir(parents=True,exist_ok=True)
   (destination/filename).write_bytes(body)
 if __name__=='__main__':build()

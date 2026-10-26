@@ -35,6 +35,6 @@ class HostedAssetsTests(unittest.TestCase):
  def test_build_publishes_only_allowlisted_files(self):
   with tempfile.TemporaryDirectory() as directory:
    build(directory)
-   self.assertEqual({p.name for p in Path(directory).iterdir()},{filename for filename,kind in STATIC_FILES.values()})
+   self.assertEqual({p.relative_to(directory).as_posix() for p in Path(directory).rglob('*') if p.is_file()},{filename for filename,kind in STATIC_FILES.values()})
    self.assertIn('Personal cloud edition',Path(directory,'index.html').read_text(encoding='utf-8'))
 if __name__=='__main__':unittest.main()
