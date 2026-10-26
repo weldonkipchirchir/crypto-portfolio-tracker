@@ -35,3 +35,6 @@ The public-data-only version does not implement CoinGlass's proprietary liquidat
 
 ## Validation
 Backend tests cover provider schemas, source identity, negative/zero funding, ratio units, malformed timestamps, data gaps, stale cache behavior, narrative identity fallback, watchlist limits/account isolation and authenticated routes. PostgreSQL integration tests exercise the new watchlist table and research routes. Node tests cover race protection, safe links/escaping, source-aware quote units, narrative search/pagination, watchlist behavior, depth, funding/OI formatting and manual USD trade overlays. Live checks verify the actual public endpoints; they do not guarantee provider uptime.
+
+
+Hosting: a single Vercel function region (Frankfurt, fra1) is configured. Bybit documents that US-hosted IPs are restricted; the default US region therefore cannot fetch its public market endpoints. This changes the existing function location, adds no proxy or API credentials, and retains normal provider restrictions and HTTPS database access. Public feed availability is still validated per venue.

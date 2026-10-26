@@ -12,5 +12,8 @@
       "destination": "/api/index"
     }
   ],
-  "outputDirectory": "public"
+  "outputDirectory": "public",
+  "regions": [
+    "fra1"
+  ]
 }
