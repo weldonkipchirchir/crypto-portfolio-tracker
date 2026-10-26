@@ -1,5 +1,5 @@
 """PostgreSQL persistence for the existing SQLite-shaped application queries."""
-import os,re,sqlite3
+import os,re,sqlite3,threading
 from contextlib import contextmanager
 UPSERTS={
  'wallet_tokens':(('wallet_id','data'),('wallet_id',)),
@@ -23,12 +23,11 @@ class Cursor:
  def rowcount(self):return self.cursor.rowcount
 class Connection:
  dialect='postgres'
- def __init__(self,url):
+ def __init__(self,url,raw=None):
   import psycopg
   self.psycopg=psycopg
-  self.raw=psycopg.connect(url,connect_timeout=10,row_factory=row_factory,**({'sslmode':'require'} if os.environ.get('VERCEL')=='1' else {}))
-  self.raw.execute("SET statement_timeout='35s'")
-  self.raw.execute("SET lock_timeout='5s'")
+  self.raw=raw or psycopg.connect(url,connect_timeout=10,row_factory=row_factory,**({'sslmode':'require'} if os.environ.get('VERCEL')=='1' else {}))
+  if raw is None:_configure(self.raw)
  def execute(self,sql,params=()):
   sql=sql.strip();insert_id=bool(re.match(r'INSERT INTO (users|trades|wallets)\(',sql,re.I))
   replace=re.match(r'INSERT OR REPLACE INTO (\w+) VALUES',sql,re.I)
@@ -55,12 +54,34 @@ class Connection:
  def __exit__(self,kind,error,tb):
   if kind:self.raw.rollback()
   else:self.raw.commit()
+_POOL=None
+_POOL_KEY=None
+_POOL_LOCK=threading.Lock()
+def _configure(raw):
+ raw.execute("SET statement_timeout='35s'")
+ raw.execute("SET lock_timeout='5s'")
+ raw.commit()
+def _pool(url):
+ # One bounded pool per worker, never shared across database URLs or TLS modes.
+ global _POOL,_POOL_KEY
+ from psycopg_pool import ConnectionPool
+ key=(url,os.environ.get('VERCEL')=='1')
+ with _POOL_LOCK:
+  if _POOL is None or _POOL_KEY!=key:
+   if _POOL is not None:_POOL.close()
+   _POOL=ConnectionPool(url,min_size=0,max_size=12,max_waiting=16,timeout=8,
+    max_idle=60,max_lifetime=300,open=True,configure=_configure,
+    check=ConnectionPool.check_connection,
+    kwargs={'connect_timeout':5,'row_factory':row_factory,**({'sslmode':'require'} if key[1] else {})})
+   _POOL_KEY=key
+  return _POOL
 @contextmanager
 def connect(url=None):
- connection=Connection(url or os.environ['DATABASE_URL'])
- try:
-  with connection:yield connection
- finally:connection.close()
+ target=url or os.environ['DATABASE_URL']
+ # Pool context commits or rolls back before reuse; no transaction can leak.
+ with _pool(target).connection() as raw:
+  yield Connection(target,raw=raw)
+
 def initialize_limits():
  with connect() as c:
   c.execute('SELECT pg_advisory_xact_lock(71420002)')

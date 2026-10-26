@@ -89,6 +89,21 @@ class CloudTests(base.APITests):
    with self.assertRaises(BudgetExceeded):
     with cloud_storage.provider_action(123):pass
   with cloud_storage.provider_action(123):pass
+ def test_pool_reuses_connection_and_restores_idle_transaction(self):
+  pids=[]
+  for _ in range(16):
+   with cloud_storage.connect() as c:pids.append(c.execute('SELECT pg_backend_pid() AS pid').fetchone()['pid'])
+  self.assertLess(len(set(pids)),len(pids))
+  self.assertLessEqual(len(set(pids)),12)
+  with self.assertRaises(RuntimeError):
+   with cloud_storage.connect() as c:
+    c.execute("INSERT INTO users(email,password) VALUES (?,?)",('pooled-rollback@test.com','dummy'))
+    raise RuntimeError('abort transaction')
+  with cloud_storage.connect() as c:
+   self.assertIsNone(c.execute('SELECT id FROM users WHERE email=?',('pooled-rollback@test.com',)).fetchone())
+ def test_pool_replaces_closed_connection(self):
+  with cloud_storage.connect() as c:c.raw.close()
+  with cloud_storage.connect() as c:self.assertEqual(c.execute('SELECT 42 AS value').fetchone()['value'],42)
  def test_rollback(self):
   with self.assertRaises(ValueError):
    with cloud_storage.connect() as c:
