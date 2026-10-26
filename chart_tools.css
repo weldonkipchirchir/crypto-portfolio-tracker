@@ -6,3 +6,7 @@
 :root[data-theme=light] .ot-dialog [stroke="#b39bff"]{stroke:#7542c5}:root[data-theme=light] .ot-dialog [stroke="#60a5fa"]{stroke:#1769aa}:root[data-theme=light] .ot-dialog [stroke="#f5b65d"]{stroke:#946500}:root[data-theme=light] .ot-pane-values span{color:var(--text)!important}
 
 :root[data-theme=light] .ot-dialog [stroke="#5caaff"]{stroke:#1769aa}:root[data-theme=light] .ot-dialog [stroke="#ffb15c"]{stroke:#946500}
+
+.ot-dialog .ot-fib-label{font-size:11px;font-weight:600;paint-order:stroke;stroke:var(--panel,#101c2e);stroke-width:3px;stroke-linejoin:round}.ot-drawing-handle{cursor:grab;pointer-events:all}.ot-drawing-handle:active{cursor:grabbing}.ot-dialog [data-ot-price]{touch-action:none}
+
+.ot-dialog [data-ot-price]{user-select:none;-webkit-user-select:none}
