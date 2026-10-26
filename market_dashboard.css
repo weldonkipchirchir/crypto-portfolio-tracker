@@ -46,3 +46,43 @@
 :root[data-theme="light"] .market-stats>div{background:linear-gradient(145deg,#fff,#edf5f0)}
 :root[data-theme="light"] .market-quote-strip{background:#f4f7fa;color:#526773}
 :root[data-theme="light"] .market-quote-strip b{color:#192b38}
+
+/* Markets: readable hierarchy, compact controls and a direct route into Studio. */
+.market-workspace{gap:22px}
+.market-intro,.market-coin-head{padding:8px 0 4px}
+.market-intro h2,.market-title h2{line-height:1.15}
+.market-intro p{max-width:66ch;line-height:1.8}
+.market-panel{border-radius:18px;padding:26px;box-shadow:0 8px 28px #0000000a}
+.market-panel-head{align-items:flex-start}
+.market-panel-head h3{margin:8px 0 0;line-height:1.35}
+.market-chart-subtitle{font-size:12px;line-height:1.7;color:var(--muted);margin:8px 0 0;max-width:56ch}
+.market-chart-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:12px;flex-shrink:0}
+.market-studio-button{min-height:44px;padding:11px 17px;background:var(--green);color:#152315;border:1px solid var(--green);border-radius:10px;font-weight:700;white-space:nowrap;box-shadow:0 3px 12px #00000012}
+.market-studio-button:hover:not(:disabled){filter:brightness(1.06);transform:translateY(-1px)}
+.market-studio-button:disabled{opacity:.5;cursor:wait}
+.market-chart-types{padding:4px;background:var(--bg);border:1px solid var(--line);border-radius:10px}
+.market-chart-types button{border:0;border-radius:7px;min-height:34px}
+.market-source-row{gap:12px;padding:18px 0;margin-bottom:12px}
+.market-source-row select{min-height:40px;border-radius:9px}
+.market-ranges button,.market-intervals button,.market-zoom button{min-height:38px;border-radius:8px}
+.market-table-wrap{border:1px solid var(--line);border-radius:12px;scrollbar-width:thin}
+.market-table-wrap th{padding-top:16px;padding-bottom:16px;font-size:10px;letter-spacing:.06em;text-transform:uppercase}
+.market-table-wrap td{padding-top:16px;padding-bottom:16px;white-space:nowrap}
+.market-table-wrap tr:hover td{background:color-mix(in srgb,var(--green) 5%,transparent)}
+.market-coin-button{min-height:38px;color:var(--text)}
+.market-detail-stat dt{font-size:12px;line-height:1.6}
+.market-detail-stat dd{font-size:19px;font-weight:600}
+.market-quote-strip{border-color:var(--line);gap:8px;line-height:1.7;border-radius:10px}
+.market-quote-strip button{min-height:34px}
+.market-news-list a{font-size:14px;line-height:1.7}
+.market-categories span{background:var(--bg)}
+.market-workspace button:focus-visible,.market-workspace select:focus-visible,.market-workspace input:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+:root[data-theme="light"] .market-inspection{background:#f1f7f5;border-color:#ccdcd5}
+:root[data-theme="light"] .market-inspection output{color:#223c36}
+:root[data-theme="light"] .market-warning{background:#fff8e8;border-color:#e7d5a9;color:#745218}
+:root[data-theme="light"] .market-icon{background:#edf5ef;border-color:#c8dfd0;color:#28674b}
+:root[data-theme="light"] .market-zoom p{color:#566c61}
+:root[data-theme="light"] .market-chart .market-axis-zone{fill:#586d62}
+@media(max-width:1100px){.market-chart-actions{flex-shrink:1}.market-stats strong{font-size:27px}}
+@media(max-width:650px){.market-workspace{gap:16px}.market-panel{padding:17px;border-radius:14px}.market-panel-head{width:100%}.market-chart-actions{width:100%;justify-content:space-between}.market-studio-button{flex:1;min-width:175px}.market-chart-subtitle{font-size:11px}.market-stats{gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}.market-stats>div:last-child{grid-column:1/-1}.market-stats>div{padding:16px;gap:9px}.market-stats strong{font-size:25px}.market-stats span{font-size:11px}.market-ranges{gap:5px}.market-ranges button{flex:1;padding:8px}.market-source-row select{min-width:0;width:100%}.market-controls{gap:12px}.market-table-wrap table{min-width:930px}.market-chart{min-height:250px}.market-quote-strip button{margin-left:0}.market-main-price{font-size:29px}.market-pagination>div{width:100%}.market-pagination button{flex:1;min-height:40px}}
+@media(prefers-reduced-motion:reduce){.market-studio-button:hover:not(:disabled){transform:none}}

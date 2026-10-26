@@ -1,0 +1,153 @@
+/* Shared workspace finish. Keep chart geometry and dialog layouts owned by their modules. */
+:root {
+  --workspace-surface: #1b2521;
+  --workspace-soft: #14201b;
+  --workspace-shadow: 0 8px 28px #00000012;
+  --workspace-radius: 16px;
+}
+:root[data-theme="light"] {
+  --workspace-surface: #fff;
+  --workspace-soft: #eef4f1;
+  --workspace-shadow: 0 8px 28px #16382b08;
+}
+body > aside {
+  background: var(--bg);
+  padding: 30px 18px 22px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+body > aside .brand { padding: 0 12px; letter-spacing: -1.2px; }
+body > aside .subtitle { padding: 0 12px; margin-bottom: 30px; font-size: 9px; }
+body > aside nav { gap: 5px; }
+body > aside nav button {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 520;
+}
+body > aside nav button:hover { background: var(--workspace-soft); filter: none; }
+body > aside nav button.active { border-color: var(--line); font-weight: 650; }
+body > aside .side-bottom {
+  border-top: 1px solid var(--line);
+  padding: 20px 12px 0;
+  margin-top: 28px;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+body > aside #logout { width: 100%; min-height: 40px; background: transparent; }
+body > main { padding-top: 28px; padding-bottom: 100px; }
+body > main > .top { min-height: 47px; padding-bottom: 20px; font-size: 12px; }
+body > main > .heading { margin: 30px 0; align-items: flex-start; }
+body > main > .heading h1 { font-size: clamp(26px, 2.5vw, 35px); letter-spacing: -1.2px; line-height: 1.2; }
+body > main > .heading #description { font-size: 13px; line-height: 1.7; max-width: 540px; }
+body > main > .heading .actions { gap: 8px; max-width: 540px; }
+body > main > .heading .actions button { min-height: 40px; font-size: 12px; padding: 10px 13px; }
+#overview .panel, #overview .card, #overview .insight-card,
+#transactions > .panel, #review .panel, #connections .connection,
+.experience-workspace .panel, .insights-panel {
+  border-radius: var(--workspace-radius);
+  box-shadow: var(--workspace-shadow);
+}
+#overview .card { position: relative; overflow: hidden; padding: 23px; }
+#overview .card small { display: block; line-height: 1.6; letter-spacing: .8px; }
+#overview .card .metric { line-height: 1.25; font-weight: 650; margin-top: 16px; }
+#overview .card p { margin-top: 10px; line-height: 1.6; }
+#overview .wallet-metrics { gap: 24px; padding-bottom: 28px; }
+#overview .wallet-metrics strong { font-weight: 650; }
+#overview .network-tile { border-radius: 12px; padding: 18px; background: var(--workspace-soft); }
+#overview .dashboard-toolbar { border-radius: 14px; gap: 16px; padding: 18px 20px; }
+#overview .dashboard-toolbar label { font-size: 11px; }
+#overview .holdings-filters { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--workspace-soft); }
+#overview .holdings-filters input, #overview .holdings-filters select { background: var(--panel); }
+#overview .holdings-table td, #transactions td { line-height: 1.55; }
+#overview .table-wrap, #transactions .table-wrap { scrollbar-width: thin; overscroll-behavior-x: contain; }
+#transactions > .panel:first-child, #review .panel:first-child { margin-top: 0; }
+#transactions .filters { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--workspace-soft); gap: 14px; }
+#transactions .filters label { font-size: 12px; }
+#transactions .summary { margin: 12px 0; line-height: 1.7; }
+#historyWallets .connection { background: var(--workspace-soft); padding: 18px; border-radius: 12px; }
+#review .fields { gap: 20px; background: var(--workspace-soft); border-radius: 12px; padding: 18px; }
+#review .fields p { margin-top: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+#review .actions { flex-wrap: wrap; margin-top: 20px; }
+#connections .grid { align-items: stretch; gap: 18px; }
+#connections .connection { min-width: 0; background: var(--panel); }
+#connections .connection h3 { font-size: 17px; line-height: 1.5; margin-bottom: 12px; }
+#connections .connection .actions { flex-wrap: wrap; gap: 8px; }
+#connections .connection .actions button { font-size: 12px; min-height: 40px; }
+#connections .connection .notice { padding: 12px; font-size: 11px; margin-top: 16px; }
+.experience-workspace { max-width: 1400px; }
+.experience-intro { margin: 4px 0 26px; }
+.experience-intro h2 { font-size: 28px; line-height: 1.25; letter-spacing: -.8px; }
+.experience-intro p { font-size: 13px; max-width: 720px; }
+.experience-grid { gap: 20px; align-items: start; }
+.experience-grid .panel h3, .experience-lessons .panel h3 { margin-top: 0; line-height: 1.45; }
+.experience-workspace form label { font-size: 12px; line-height: 1.5; }
+.experience-workspace form input, .experience-workspace form textarea { min-height: 44px; border-radius: 10px; }
+.experience-workspace form .actions { flex-wrap: wrap; }
+.experience-note { background: var(--workspace-soft); border-radius: 12px; padding: 16px; }
+.experience-note:hover { border-color: var(--green); filter: none; }
+.experience-note strong { font-size: 14px; }
+.experience-lessons .panel { padding: 22px; }
+.experience-lessons a { display: inline-block; padding: 7px 0; line-height: 1.6; }
+.advanced-panel, .targets-panel { border-radius: var(--workspace-radius); box-shadow: var(--workspace-shadow); }
+#auth { background: radial-gradient(ellipse at 10% 10%, var(--workspace-surface), transparent 65%), var(--bg); }
+#auth .auth-layout { gap: clamp(30px, 6vw, 80px); padding: 16px 0; }
+#auth .auth-story h2 { max-width: 570px; margin-top: 16px; font-weight: 650; }
+#auth .auth-story p { max-width: 490px; font-size: 15px; }
+#auth .auth-story ul { padding: 0; list-style: none; display: grid; gap: 12px; }
+#auth .auth-story li { padding-left: 23px; position: relative; font-size: 13px; }
+#auth .auth-story li::before { content: '✓'; position: absolute; left: 0; color: var(--green); }
+#auth .panel { border-radius: 24px; box-shadow: 0 24px 80px #0000001a; }
+#auth .brand { margin-bottom: 25px; }
+#auth .auth-tabs { background: var(--workspace-soft); padding: 5px; border: 1px solid var(--line); border-radius: 12px; }
+#auth .auth-tabs button { border-color: transparent; background: transparent; border-radius: 8px; }
+#auth .auth-tabs button[aria-pressed="true"] { background: var(--panel); border-color: var(--line); box-shadow: 0 2px 8px #00000010; }
+#auth input { border-radius: 10px; }
+#auth #authSubmit { min-height: 48px; margin-top: 4px; border-radius: 10px; }
+#auth #authError { margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+#auth #authDescription { margin-bottom: 0; }
+:root[data-theme="light"] #overview .allocation-track,
+:root[data-theme="light"] .insights-allocation-bar,
+:root[data-theme="light"] .insights-allocation-bar::-webkit-progress-bar { background: #e2eae5; }
+:root[data-theme="light"] #overview tbody tr:hover,
+:root[data-theme="light"] #transactions tbody tr:hover { background: #f4f8f5; }
+@media (max-width: 1150px) and (min-width: 651px) {
+  body > main > .heading { flex-wrap: wrap; gap: 18px; }
+  body > main > .heading .actions { justify-content: flex-start; max-width: none; }
+}
+@media (max-width: 650px) {
+  body > aside { padding: 20px 16px 10px; border-right: 0; overflow-y: visible; }
+  body > aside .brand { padding: 0; }
+  body > aside nav { margin-top: 18px; gap: 6px; padding-bottom: 9px; }
+  body > aside nav button { min-height: 42px; padding: 10px 14px; border-radius: 22px; font-size: 12px; flex-shrink: 0; }
+  body > main { padding: 18px 16px 96px; }
+  body > main > .top { font-size: 11px; min-height: 32px; padding-bottom: 14px; }
+  body > main > .heading { margin: 23px 0; gap: 17px; }
+  body > main > .heading .actions { width: 100%; justify-content: flex-start; }
+  body > main > .heading .actions button { padding: 10px; font-size: 11px; }
+  #overview .card { padding: 16px; border-radius: 13px; }
+  #overview .card small { font-size: 9px; letter-spacing: .45px; }
+  #overview .card .metric { font-size: 23px; overflow-wrap: anywhere; }
+  #overview .wallet-metrics { gap: 22px 14px; }
+  #overview .network-strip { gap: 10px; }
+  #overview .network-tile { padding: 14px; }
+  #overview .dashboard-toolbar { padding: 16px; }
+  #overview .holdings-filters { padding: 12px; gap: 12px; }
+  #overview .holdings-filters label { min-width: 0; width: 100%; }
+  #transactions .filters { padding: 12px; }
+  #transactions .filters label { flex-basis: calc(50% - 14px); min-width: 120px; }
+  #transactions .panel, #review .panel { padding: 18px 15px; }
+  #review .fields { padding: 14px; }
+  #connections .connection { padding: 20px; }
+  .experience-intro h2 { font-size: 24px; }
+  .experience-workspace .panel { padding: 20px; }
+  #auth .auth-layout { padding: 0; }
+  #auth .panel { padding: 27px 23px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  body > aside nav button, #auth .auth-tabs button, .experience-note { transition: background .15s, border-color .15s; }
+}
+
+#portfolioInsights > :only-child{grid-column:1/-1}
