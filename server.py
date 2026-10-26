@@ -5,6 +5,7 @@ import token_integrations
 import token_discovery
 import token_pricing
 import advanced_portfolio
+import portfolio_performance
 import price_targets
 import coin_market
 import market_quotes
@@ -244,7 +245,7 @@ class Handler(BaseHTTPRequestHandler):
    rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=? ORDER BY date,id',(uid,))]
    prices={r['symbol']:r['price'] for r in c.execute('SELECT * FROM prices WHERE user_id=?',(uid,))}
    records,statuses=history_state(c,uid)
-   self.send(200,dict(**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=rows,assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
+   self.send(200,dict(pnl_calendar=portfolio_performance.realized_calendar(rows),**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=rows,assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
  def do_POST(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   origin=self.headers.get('Origin')

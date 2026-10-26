@@ -125,11 +125,12 @@ def coin_row(raw):
   row[field]=numeric(raw.get(field))
  row['price_change_percentage_24h']=numeric(raw.get('price_change_percentage_24h'),True)
  row['price_change_percentage_7d']=numeric(raw.get('price_change_percentage_7d_in_currency'),True)
+ row['price_change_percentage_30d']=numeric(raw.get('price_change_percentage_30d_in_currency'),True)
  return row
 
 def listings(force=False):
  def load():
-  payload=request('/coins/markets?'+urlencode({'vs_currency':'usd','order':'market_cap_desc','per_page':250,'page':1,'sparkline':'false','price_change_percentage':'24h,7d'}))
+  payload=request('/coins/markets?'+urlencode({'vs_currency':'usd','order':'market_cap_desc','per_page':250,'page':1,'sparkline':'false','price_change_percentage':'24h,7d,30d'}))
   if not isinstance(payload,list) or not 1<=len(payload)<=250:raise ValueError('Invalid markets response')
   seen=set();rows=[]
   for raw in payload:
@@ -138,7 +139,7 @@ def listings(force=False):
   if not rows:raise ValueError('No valid market records')
   rows.sort(key=lambda r:(r['market_cap_rank'],r['id']))
   return {'coins':rows,'availability':dict(AVAILABILITY),'coverage':'Top 250 provider-ranked coins; available rows may be fewer.'}
- return cached(('list',),300,load,force)
+ return cached(('list','periods-v2'),300,load,force)
 
 def allowed(coin_id):
  identity=identifier(coin_id)

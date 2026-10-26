@@ -9,6 +9,11 @@ class MarketTests(unittest.TestCase):
   bad=row('bad',2);bad['market_cap']=float('nan');bad['current_price']=None
   with patch('providers.request_json',return_value=[row('second',2),row(),row(),bad]):data=m.listings()
   self.assertEqual([c['id'] for c in data['coins']],['bitcoin','bad','second']);self.assertIsNone(data['coins'][1]['market_cap']);self.assertIsNone(data['coins'][1]['current_price'])
+ def test_30d_market_changes_preserve_missing_and_signed_values(self):
+  item=row();item['price_change_percentage_30d_in_currency']=-12.5
+  with patch('providers.request_json',return_value=[item]) as request:
+   value=m.listings();self.assertEqual(value['coins'][0]['price_change_percentage_30d'],'-12.5');self.assertIn('30d',request.call_args.args[0])
+  self.assertIsNone(m.coin_row(row())['price_change_percentage_30d'])
  def test_ids_reject_traversal_and_unknown(self):
   for value in ['../secret','https://evil','Bitcoin',True,'x'*101]:
    with self.assertRaises(ValueError):m.identifier(value)

@@ -46,6 +46,10 @@ class UpgradeTests(base.APITests):
   with patch('providers.market_prices',return_value={'BTC':{'price':'50000','source':'fixture','updated_at':456}}),patch('coin_market.listings',return_value={'coins':[{'id':'binancecoin','current_price':600,'last_updated':456}]}),patch('exchange_connections.crypt',side_effect=AssertionError('must not decrypt')),patch('exchange_connections.signed',side_effect=AssertionError('must not resync')):
    self.call(self.a,'refresh-prices',{})
   saved=self.call(self.a,'state')['exchanges'][0]['snapshot'];self.assertEqual(saved['balances'][0]['value_usd'],'750.00');self.assertEqual(saved['balances'][0]['quantity'],'1');self.assertEqual(saved['updated_at'],123);self.assertEqual(self.call(self.b,'state')['exchanges'],[])
+ def test_realized_calendar_is_account_scoped_and_utc(self):
+  self.call(self.a,'trade',{'date':'2023-01-01','symbol':'BTC','side':'buy','quantity':'2','price':'100','fee':'2'})
+  self.call(self.a,'trade',{'date':'2024-01-01T23:00:00-02:00','symbol':'BTC','side':'sell','quantity':'1','price':'150','fee':'1'})
+  result=self.call(self.a,'state')['pnl_calendar'];self.assertEqual(result['days'],[{'date':'2024-01-02','realized':48.0,'sales':1}]);self.assertEqual(self.call(self.b,'state')['pnl_calendar']['days'],[])
  def test_exchange_state_no_secret(self):
   result=self.call(self.a,'exchange-state',{});self.assertEqual(result['connections'],[]);self.assertNotIn('credentials',str(result))
 
