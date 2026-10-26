@@ -7,6 +7,7 @@ import token_pricing
 import advanced_portfolio
 import price_targets
 import coin_market
+import market_quotes
 import protocol_data
 import market_news
 import market_intelligence
@@ -231,7 +232,7 @@ class Handler(BaseHTTPRequestHandler):
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   static={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8'),'/market_dashboard.js':('market_dashboard.js','text/javascript; charset=utf-8'),'/market_dashboard.css':('market_dashboard.css','text/css; charset=utf-8'),'/market_intelligence.js':('market_intelligence.js','text/javascript; charset=utf-8'),'/trade_chart_markers.js':('trade_chart_markers.js','text/javascript; charset=utf-8'),'/market_intelligence.css':('market_intelligence.css','text/css; charset=utf-8')}
-  for filename in ('pine_bridge.js','pine_editor.js','coin_alerts.js','experience_ui.js','chart_tools.js','experience_ui.css','chart_tools.css'):
+  for filename in ('chart_panels.js','pine_bridge.js','pine_editor.js','coin_alerts.js','experience_ui.js','chart_tools.js','experience_ui.css','chart_tools.css'):
    static['/'+filename]=(filename,('text/javascript' if filename.endswith('.js') else 'text/css')+'; charset=utf-8')
   if self.path in static:
    filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
@@ -283,7 +284,7 @@ class Handler(BaseHTTPRequestHandler):
      self.send_response(200); self.send_header('Set-Cookie','session='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400'+('; Secure' if os.environ.get('ORBIT_SECURE_COOKIE')=='1' else '')); self.send_header('Content-Type','application/json'); self.end_headers(); self.wfile.write(b'{"ok":true}'); return
     uid=self.user(c)
     if not uid: self.send(401,{'error':'Sign in to continue'}); return
-    market_action=self.path in ('/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news','/api/intelligence-overview','/api/intelligence-narrative','/api/intelligence-rsi','/api/intelligence-venues','/api/intelligence-flow','/api/intelligence-derivatives','/api/intelligence-exposures')
+    market_action=self.path in ('/api/market-quote','/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news','/api/intelligence-overview','/api/intelligence-narrative','/api/intelligence-rsi','/api/intelligence-venues','/api/intelligence-flow','/api/intelligence-derivatives','/api/intelligence-exposures')
     if market_action:budget=__import__('cloud_storage').provider_action(uid,kind='market',limit=60,max_concurrent=4) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)
     else:budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens','/api/market-watch-toggle') else nullcontext()
     with budget, providers.deadline(time.monotonic()+30):
@@ -291,6 +292,7 @@ class Handler(BaseHTTPRequestHandler):
       c.commit()
       with coin_market.persistence(market_cache_read,market_cache_write):
        if self.path=='/api/market-listings':result={**coin_market.listings(),'exchange_coin_ids':sorted(exchange_charts.ASSETS)}
+       elif self.path=='/api/market-quote':result=market_quotes.quote(raw.get('coin_id'),raw.get('source','coingecko'))
        elif self.path=='/api/market-detail':result=coin_market.detail(raw.get('coin_id'))
        elif self.path=='/api/market-chart':
         source=raw.get('source','coingecko')

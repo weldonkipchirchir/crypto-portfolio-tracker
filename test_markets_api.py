@@ -13,6 +13,11 @@ class MarketsAPITests(test_integrations.APITests):
   with self.assertRaises(urllib.error.HTTPError):self.call(self.a,'market-chart',{'coin_id':'bitcoin','source':'bad'})
   with patch('market_news.news',return_value={'articles':[]}):self.assertEqual(self.call(self.a,'market-news',{'coin_id':'bitcoin'})['articles'],[])
   with patch('protocol_data.fundamentals',return_value={'coin_id':'bitcoin'}):self.assertEqual(self.call(self.a,'market-fundamentals',{'coin_id':'bitcoin'})['coin_id'],'bitcoin')
+ def test_quote_route(self):
+  with self.assertRaises(urllib.error.HTTPError):self.call(self.client(),'market-quote',{'coin_id':'bitcoin'})
+  with patch('market_quotes.quote',return_value={'coin_id':'bitcoin','price':'100','quote_currency':'USDT'}) as quote:
+   self.assertEqual(self.call(self.a,'market-quote',{'coin_id':'bitcoin','source':'binance'})['price'],'100');quote.assert_called_once_with('bitcoin','binance')
+  with self.assertRaises(urllib.error.HTTPError):self.call(self.a,'market-quote',{'coin_id':'bitcoin','source':'bad'})
  def test_explicit_intervals_and_source_validation(self):
   with patch('exchange_charts.chart',return_value={'interval_code':'4h','candles':[]}) as chart:
    result=self.call(self.a,'market-chart',{'coin_id':'bitcoin','days':30,'kind':'candles','source':'binance','interval':'4h'})
