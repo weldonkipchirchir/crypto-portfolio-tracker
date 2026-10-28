@@ -33,3 +33,7 @@ const rows=Array.from({length:32},(_,i)=>({id:'coin-'+i,name:i===0?'<img src=x o
 })().catch(e=>{console.error(e);process.exitCode=1});
 
 assert(mod.plot([{timestamp:1700000000000,price:10},{timestamp:1700086400000,price:11}]).includes('aria-label="Open Chart Studio from chart"'));
+
+assert.equal(mod.fitChartMarkup('<line x1="90" x2="890"/><polyline points="90,20 890,30"/>',.5),'<line x1="75.000" x2="445.000"/><polyline points="75.000,-0.500 445.000,13.000"/>');context.window.innerWidth=390;const mobileChart=mod.candles([{timestamp:1,open:2,high:4,low:1,close:3},{timestamp:2,open:3,high:5,low:2,close:4}]);assert(mobileChart.includes('viewBox="0 0 500 450"'));assert(mobileChart.includes('data-plot-scale="0.5"'));context.window.innerWidth=1200;assert(mod.candles([{timestamp:1,open:2,high:4,low:1,close:3}]).includes('viewBox="0 0 1000 450"'));
+
+assert(mod.fitChartMarkup('<line x1="90" y1="50" x2="890" y2="290"/>',1,1.35).includes('y2="364.000"'));
