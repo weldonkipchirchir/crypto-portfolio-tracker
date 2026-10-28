@@ -18,6 +18,13 @@ class FeatureAPITests(test_integrations.APITests):
   self.call(self.a,'import',{'csv':csv})
   result=self.call(self.a,'import',{'csv':csv+'\n2026-01-02,ETH,buy,2,200'})
   self.assertEqual(result['imported'],1);self.assertEqual(result['duplicates'],1);self.assertEqual(len(self.call(self.a,'state')['trades']),2)
+ def test_binance_preview_and_acknowledgement(self):
+  from test_binance_import import HEADER,ROW,OPTIONS
+  payload={'csv':HEADER+'\n'+ROW,'options':OPTIONS}
+  result=self.call(self.a,'import-preview',payload);self.assertTrue(result['requires_acknowledgement']);self.assertEqual(result['count'],1);self.assertEqual(self.call(self.a,'state')['trades'],[])
+  with self.assertRaises(urllib.error.HTTPError):self.call(self.a,'import',payload)
+  self.assertEqual(self.call(self.a,'state')['trades'],[])
+  result=self.call(self.a,'import',{**payload,'acknowledge_warnings':True});self.assertEqual(result['imported'],1);self.assertEqual(len(self.call(self.a,'state')['trades']),1)
  def test_token_inspection_requires_ownership(self):
   self.call(self.a,'wallet',{'chain':'Ethereum','address':'0x'+'1'*40})
   wid=self.call(self.a,'state')['wallets'][0]['id']

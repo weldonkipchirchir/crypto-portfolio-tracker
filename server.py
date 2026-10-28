@@ -370,7 +370,7 @@ class Handler(BaseHTTPRequestHandler):
       c.commit();self.send(200,{'ok':True,**result});return
      elif self.path=='/api/import-preview':
       rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=?',(uid,))]
-      self.send(200,imports.preview(raw.get('csv'),rows,trade,calculate)); return
+      self.send(200,imports.preview(raw.get('csv'),rows,trade,calculate,raw.get('options'))); return
      elif self.path=='/api/review':
       records,_=history_state(c,uid)
       candidate=next((r for r in review_state(c,uid,records) if r['id']==raw.get('id')),None)
@@ -475,7 +475,8 @@ class Handler(BaseHTTPRequestHandler):
       rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=?',(uid,))]
       summary=None
       if self.path=='/api/import':
-       summary=imports.preview(raw.get('csv'),rows,trade,calculate)
+       summary=imports.preview(raw.get('csv'),rows,trade,calculate,raw.get('options'))
+       if summary.get('requires_acknowledgement') and raw.get('acknowledge_warnings') is not True:raise ValueError('Review and acknowledge Binance timezone, conversion and missing-fee warnings before importing.')
        if summary['errors']: raise ValueError('CSV has errors: '+ '; '.join('row '+str(e['row'])+': '+e['error'] for e in summary['errors'][:5]))
        additions=summary['trades']
       else: additions=[trade(raw)]
