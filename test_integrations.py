@@ -15,6 +15,10 @@ class ProviderTests(unittest.TestCase):
  def test_price_ids(self):
   with patch('providers.request_json',return_value={'ethereum':{'usd':2000,'last_updated_at':123}}):
    quotes=providers.market_prices(['ETH','FAKE']);self.assertEqual(quotes['ETH']['price'],'2000');self.assertNotIn('FAKE',quotes)
+ def test_imported_coin_prices(self):
+  ids={'NEAR':'near','UNI':'uniswap','AAVE':'aave','RENDER':'render-token','SUI':'sui','ENA':'ethena'}
+  with patch('providers.request_json',return_value={coin:{'usd':2,'last_updated_at':123} for coin in ids.values()}):
+   self.assertEqual(set(providers.market_prices(list(ids)+['UNKNOWN'])),set(ids))
 class APITests(unittest.TestCase):
  def setUp(self):
   self.pricing_patch=patch('token_pricing.get_quote',return_value=None);self.pricing_patch.start();self.addCleanup(self.pricing_patch.stop)

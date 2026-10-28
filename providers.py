@@ -32,7 +32,7 @@ CHAINS={
  'Tron':('TRX',6,'TRON_API_URL','https://api.trongrid.io')}
 EVM_CHAINS=('Ethereum','Optimism','BNB Chain','Base','Arbitrum','Polygon','Avalanche','Sonic','Gnosis','Celo','Arc','Monad','Robinhood Chain','Linea')
 LEDGER_ALIASES={'Bitcoin':'BTC','Stellar':'XLM','Tron':'TRX','Arc':'USDC_ARC','Monad':'MON','Robinhood Chain':'ETH_RH','Linea':'ETH_LINEA','Sonic':'S','Gnosis':'XDAI','Celo':'CELO','Ethereum':'ETH','Optimism':'ETH_OP','BNB Chain':'BNB','Solana':'SOL','Aptos':'APT','Sui':'SUI','Base':'ETH_BASE','Arbitrum':'ETH_ARB','Polygon':'POL','Avalanche':'AVAX'}
-COINS={'XLM':'stellar','TRX':'tron','MON':'monad','USDC_ARC':'usd-coin','ETH_RH':'ethereum','ETH_LINEA':'ethereum','S':'sonic-3','XDAI':'xdai','CELO':'celo','ETH_BASE':'ethereum','ETH_ARB':'ethereum','POL':'polygon-ecosystem-token','AVAX':'avalanche-2','ETH_OP':'ethereum','BTC':'bitcoin','ETH':'ethereum','SOL':'solana','BNB':'binancecoin','APT':'aptos','SUI':'sui','OP':'optimism','USDC':'usd-coin','USDT':'tether'}
+COINS={'NEAR':'near','UNI':'uniswap','AAVE':'aave','RENDER':'render-token','ENA':'ethena','XLM':'stellar','TRX':'tron','MON':'monad','USDC_ARC':'usd-coin','ETH_RH':'ethereum','ETH_LINEA':'ethereum','S':'sonic-3','XDAI':'xdai','CELO':'celo','ETH_BASE':'ethereum','ETH_ARB':'ethereum','POL':'polygon-ecosystem-token','AVAX':'avalanche-2','ETH_OP':'ethereum','BTC':'bitcoin','ETH':'ethereum','SOL':'solana','BNB':'binancecoin','APT':'aptos','SUI':'sui','OP':'optimism','USDC':'usd-coin','USDT':'tether'}
 def validate_address(chain,address):
  if chain not in CHAINS: raise ValueError('Unsupported chain')
  address=str(address).strip()
