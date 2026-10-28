@@ -198,6 +198,18 @@ def calculate(rows,prices):
   a['unrealized']=a['value']-a['cost'] if a['value'] is not None else None
   result.append({k:float(v) if isinstance(v,Decimal) else v for k,v in a.items()})
  return result
+def trade_results(rows):
+ holdings={};result=[]
+ for row in sorted(rows,key=lambda r:(r['date'],r.get('id',0))):
+  a=holdings.setdefault(row['symbol'],{'quantity':Decimal(0),'cost':Decimal(0)})
+  q=number(row['quantity'],True);p=number(row['price']);fee=number(row['fee']);profit=None
+  if row['side']=='buy':a['quantity']+=q;a['cost']+=q*p+fee
+  else:
+   if q>a['quantity']:raise ValueError('Sale exceeds available holdings')
+   basis=a['cost']/a['quantity']*q;profit=q*p-fee-basis;a['cost']-=basis;a['quantity']-=q
+  result.append({**row,'realized_pnl':float(profit) if profit is not None else None,'net_cash_flow':float(-(q*p+fee) if row['side']=='buy' else q*p-fee)})
+ return result
+
 def trade(raw):
  date=datetime.fromisoformat(str(raw['date']).replace('Z','+00:00'))
  if date.tzinfo: date=datetime.fromtimestamp(date.timestamp(),__import__('datetime').timezone.utc).replace(tzinfo=None)
@@ -245,7 +257,7 @@ class Handler(BaseHTTPRequestHandler):
    rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=? ORDER BY date,id',(uid,))]
    prices={r['symbol']:r['price'] for r in c.execute('SELECT * FROM prices WHERE user_id=?',(uid,))}
    records,statuses=history_state(c,uid)
-   self.send(200,dict(pnl_calendar=portfolio_performance.realized_calendar(rows),**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=rows,assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
+   self.send(200,dict(pnl_calendar=portfolio_performance.realized_calendar(rows),**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=trade_results(rows),assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
  def do_POST(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   origin=self.headers.get('Origin')
@@ -348,7 +360,7 @@ class Handler(BaseHTTPRequestHandler):
       exists=c.execute('SELECT coin_id FROM market_favorites WHERE user_id=? AND coin_id=?',(uid,identity)).fetchone();c.commit()
       if not exists:
        with coin_market.persistence(market_cache_read,market_cache_write):prepared_watch=market_watch.resolve(identity)
-     if self.path in ('/api/trade','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove','/api/market-watch-toggle'):
+     if self.path in ('/api/trade','/api/trade-update','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove','/api/market-watch-toggle'):
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')
       if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
@@ -468,6 +480,13 @@ class Handler(BaseHTTPRequestHandler):
       c.execute('DELETE FROM chain_history WHERE wallet_id=?',(raw['id'],))
       c.execute('DELETE FROM history_sync WHERE wallet_id=?',(raw['id'],))
       c.execute('DELETE FROM wallets WHERE user_id=? AND id=?',(uid,raw['id']))
+     elif self.path=='/api/trade-update':
+      rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=?',(uid,))]
+      target=next((r for r in rows if r['id']==raw.get('id')),None)
+      if target is None:raise ValueError('Trade not found')
+      updated={**trade(raw),'id':target['id']}
+      calculate([updated if r['id']==target['id'] else r for r in rows],{})
+      c.execute('UPDATE trades SET date=?,symbol=?,side=?,quantity=?,price=?,fee=?,account=? WHERE user_id=? AND id=?',(*(updated[k] for k in ('date','symbol','side','quantity','price','fee','account')),uid,target['id']))
      elif self.path in ('/api/trade','/api/import'):
       if self.path=='/api/import':
        digest=hashlib.sha256(raw['csv'].strip().encode()).hexdigest()
