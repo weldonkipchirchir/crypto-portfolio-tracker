@@ -94,7 +94,7 @@ def chart(coin_id,days,kind='line',source='binance',interval=None):
   coverage=(('ALL queries available '+pair+' history from '+('the earliest exchange candles' if source=='binance' else '2015-01-01')+'; all requested pages completed. ') if requested=='max' else '')
   coverage+=source.title()+' '+pair+' spot '+granularity+' OHLC; '+quote+' quote units'+(' (USDT is not USD)' if quote=='USDT' else '')+'. Timestamps are bucket open times; the latest candle may still be forming. Missing trade buckets are not filled. Exchange-pair history is not the full history of the coin.'
   return {'coin_id':identity,'days':requested,'kind':kind,'chart_type':kind,'source':('Binance' if source=='binance' else 'Coinbase Exchange'),'pair':pair,'quote_currency':quote,'base_currency':base,'interval':granularity,'interval_code':auto_interval if source=='binance' else {3600:'1h',21600:'6h',86400:'1d'}[auto_interval],'interval_seconds':{'1w':604800,'30m':1800,'4h':14400,'1d':86400}[auto_interval] if source=='binance' else auto_interval,'history_start_requested':start*1000,'observed_from':ordered[0]['timestamp'],'observed_to':ordered[-1]['timestamp'],'complete_request':True,'request_chunks':chunks,'coverage':coverage,('candles' if kind=='candles' else 'points'):(ordered if kind=='candles' else [{'timestamp':p['timestamp'],'price':p['close']} for p in ordered])}
- return market.cached(('chart','exchange',source,identity,requested,kind)+((interval,) if interval is not None else ()),300,load)
+ return market.cached(('chart','exchange',source,identity,requested,kind)+((interval,) if interval is not None else ()),60 if interval in ('1m','5m','15m','30m','1h') else 300,load)
 
 
 def bucket_start(stamp,seconds):
