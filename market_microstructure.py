@@ -33,7 +33,8 @@ def spot_metadata(base):
  if meta.get('stale'):raise ValueError('Fresh exchange identity verification unavailable')
 
 def microstructure(coin_id,venue='binance'):
- if venue!='binance':raise ValueError('Only Binance spot snapshots are supported')
+ if venue=='coinbase':return coinbase_microstructure(coin_id)
+ if venue!='binance':raise ValueError('Choose Binance or Coinbase spot snapshots')
  coin,base=identity(coin_id);pair=base+'USDT'
  context={'source':'Binance','pair':pair,'base_currency':base,'quote_currency':'USDT','source_url':'https://www.binance.com/en/trade/'+base+'_USDT'}
  def book():
@@ -170,3 +171,45 @@ def exposures(coin_id):
  for name,loader,url in [('binance',binance,'https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Mark-Price'),('bybit',bybit,'https://bybit-exchange.github.io/docs/v5/market/tickers'),('okx',okx,'https://www.okx.com/docs-v5/en/#public-data-rest-api-get-open-interest')]:
   venues.append(feed(('exposures',name,coin),loader,venue=name,source_url=url))
  return {'coin_id':coin,'venues':venues,'coverage':'Public perpetual-futures funding and open-interest snapshots. Funding fractions apply per provider period, not annualized returns. Positive funding generally means longs pay shorts; negative means shorts pay longs. Venue totals and units differ; no cross-exchange aggregate, liquidation estimate, or trading execution.'}
+
+
+def coinbase_microstructure(coin_id):
+ coin,base=identity(coin_id);pair=base+'-USD'
+ context={'source':'Coinbase Exchange','pair':pair,'base_currency':base,'quote_currency':'USD','source_url':'https://exchange.coinbase.com/trade/'+pair}
+ def verify():
+  meta=exchange.metadata('coinbase',pair,base,'USD')
+  if meta.get('stale'):raise ValueError('Fresh Coinbase product verification unavailable')
+ def book():
+  verify();raw=providers.request_json('https://api.exchange.coinbase.com/products/'+pair+'/book?level=2')
+  if not isinstance(raw,dict) or raw.get('auction_mode') is True:raise ValueError('Unavailable or auction order book')
+  result={}
+  for side,reverse in [('bids',True),('asks',False)]:
+   rows=raw.get(side)
+   if not isinstance(rows,list) or not 1<=len(rows)<=50000:raise ValueError('Invalid Coinbase book size')
+   levels={}
+   for row in rows:
+    if not isinstance(row,list) or len(row)!=3:raise ValueError('Invalid Coinbase level')
+    price,quantity=positive(row[0]),positive(row[1])
+    if type(row[2]) is not int or row[2]<1 or price in levels:raise ValueError('Invalid aggregated level')
+    levels[price]=quantity
+   total=Decimal(0);out=[]
+   for price in sorted(levels,reverse=reverse)[:100]:
+    quantity=levels[price];total+=quantity;out.append({'price':str(price),'quantity':str(quantity),'cumulative_quantity':str(total),'notional':str(price*quantity)})
+   result[side]=out
+  if Decimal(result['bids'][0]['price'])>=Decimal(result['asks'][0]['price']):raise ValueError('Crossed Coinbase book')
+  result.update(observed_at=int(time.time()*1000),coverage='Nearest 100 Coinbase spot price levels per side, aggregated across orders at each price. Size is already aggregated and is not multiplied by order count. Receipt timestamp; cancellable orders, not executions or a historical heatmap.')
+  return result
+ def trades():
+  verify();raw=providers.request_json('https://api.exchange.coinbase.com/products/'+pair+'/trades?limit=100')
+  if not isinstance(raw,list) or len(raw)>100:raise ValueError('Invalid Coinbase trades')
+  sample=[];seen=set()
+  for row in raw:
+   if not isinstance(row,dict) or type(row.get('trade_id')) is not int or row.get('side') not in ('buy','sell'):raise ValueError('Invalid Coinbase trade identity')
+   stamp=market.stamp(row.get('time'))
+   if stamp is None:raise ValueError('Invalid Coinbase trade time')
+   ts=timestamp(stamp*1000);price=positive(row.get('price'));quantity=positive(row.get('size'))
+   if row['trade_id'] in seen:continue
+   seen.add(row['trade_id']);sample.append({'id':row['trade_id'],'timestamp':ts,'price':str(price),'quantity':str(quantity),'notional':str(price*quantity),'direction':'sell' if row['side']=='buy' else 'buy'})
+  sample.sort(key=lambda r:r['timestamp'])
+  return {'sample_trades':sample,'trades':sorted([r for r in sample if Decimal(r['notional'])>=100000],key=lambda r:r['timestamp'],reverse=True),'threshold':'100000','sample_size':len(sample),'observed_from':sample[0]['timestamp'] if sample else None,'observed_to':sample[-1]['timestamp'] if sample else None,'coverage':'Latest 100 Coinbase spot prints; displayed large prints meet 100,000 USD. Coinbase maker side is reversed to show taker direction. Exchange trades do not identify whales or wallet transfers. Not a complete time window or background alert service.'}
+ return {'coin_id':coin,'orderbook':feed(('book','coinbase',coin),book,**context),'large_trades':feed(('trades','coinbase',coin),trades,**context)}
