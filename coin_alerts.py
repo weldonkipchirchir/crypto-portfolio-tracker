@@ -1,3 +1,4 @@
+import alert_email
 """Manual account-owned market price alerts; accepts trusted provider detail only."""
 import json,time,uuid
 from decimal import Decimal,InvalidOperation
@@ -6,6 +7,7 @@ MAX_RULES=50
 MAX_EVENTS=200
 
 def init(c):
+ alert_email.init(c)
  c.execute('CREATE TABLE IF NOT EXISTS coin_alerts (id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,coin_id TEXT NOT NULL,data TEXT NOT NULL)')
  c.execute('CREATE INDEX IF NOT EXISTS coin_alerts_user ON coin_alerts(user_id,coin_id)')
  c.execute('CREATE TABLE IF NOT EXISTS coin_alert_events (id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,coin_id TEXT NOT NULL,created_at INTEGER NOT NULL,data TEXT NOT NULL)')
@@ -23,7 +25,7 @@ def state(c,uid,coin_id=None):
  suffix=' AND coin_id=?' if coin_id else '';args=(uid,coin_id) if coin_id else (uid,)
  rules=[json.loads(r['data']) for r in c.execute('SELECT data FROM coin_alerts WHERE user_id=?'+suffix+' ORDER BY id',args)]
  events=[json.loads(r['data']) for r in c.execute('SELECT data FROM coin_alert_events WHERE user_id=?'+suffix+' ORDER BY created_at DESC,id DESC',args)]
- return {'alerts':sorted(rules,key=lambda r:(-r['created_at'],r['id'])),'events':events,'coverage':'In-app USD alerts checked manually against fresh CoinGecko quotes. No background monitoring, email or push delivery. First matching check records an observed condition; later events require leaving and re-entering the condition.'}
+ return {'delivery':alert_email.state(c,uid),'alerts':sorted(rules,key=lambda r:(-r['created_at'],r['id'])),'events':events,'coverage':'In-app USD alerts checked manually against fresh CoinGecko quotes. Email delivery is available when enabled and configured. No closed-app background monitoring or push delivery. First matching check records an observed condition; later events require leaving and re-entering the condition.'}
 
 def save(c,uid,raw,prepared):
  if not isinstance(raw,dict):raise ValueError('Choose a coin and alert price')
@@ -57,7 +59,7 @@ def evaluate(c,uid,prepared,now=None):
   threshold=number(rule['target_usd']);met=price>=threshold if rule['operator']=='above' else price<=threshold
   if met and not rule['condition_met']:
    event={k:rule[k] for k in ('coin_id','name','symbol','operator','target_usd')};event.update(id=str(uuid.uuid4()),alert_id=rule['id'],price_usd=str(price),quote_at=stamp,created_at=now,source='CoinGecko',first_observation=rule['last_quote_at'] is None)
-   c.execute('INSERT INTO coin_alert_events(id,user_id,coin_id,created_at,data) VALUES (?,?,?,?,?)',(event['id'],uid,identity,now,json.dumps(event)));triggered+=1
+   c.execute('INSERT INTO coin_alert_events(id,user_id,coin_id,created_at,data) VALUES (?,?,?,?,?)',(event['id'],uid,identity,now,json.dumps(event)));alert_email.enqueue(c,uid,event);triggered+=1
   rule.update(last_quote_at=stamp,condition_met=met)
   c.execute('UPDATE coin_alerts SET data=? WHERE user_id=? AND id=?',(json.dumps(rule),uid,rule['id']));evaluated+=1
  # Keep the newest 200 events across all of this account's coins.

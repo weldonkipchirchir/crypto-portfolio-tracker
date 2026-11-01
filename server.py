@@ -4,6 +4,7 @@ import imports
 import token_integrations
 import token_discovery
 import token_pricing
+import alert_email
 import portfolio_daily
 import advanced_portfolio
 import portfolio_performance
@@ -259,7 +260,7 @@ class Handler(BaseHTTPRequestHandler):
    rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=? ORDER BY date,id',(uid,))]
    prices={r['symbol']:r['price'] for r in c.execute('SELECT * FROM prices WHERE user_id=?',(uid,))}
    records,statuses=history_state(c,uid)
-   self.send(200,dict(portfolio_calendar=portfolio_daily.calendar(c,uid),pnl_calendar=portfolio_performance.realized_calendar(rows),**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=trade_results(rows),assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
+   self.send(200,dict(alert_email=alert_email.state(c,uid),portfolio_calendar=portfolio_daily.calendar(c,uid),pnl_calendar=portfolio_performance.realized_calendar(rows),**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=trade_results(rows),assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
  def do_POST(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   origin=self.headers.get('Origin')
@@ -318,13 +319,17 @@ class Handler(BaseHTTPRequestHandler):
        elif self.path=='/api/market-news':result=market_news.news(raw.get('coin_id'))
        elif self.path=='/api/intelligence-overview':result=market_intelligence.overview()
        elif self.path=='/api/intelligence-narrative':result=market_intelligence.narratives(raw.get('slug','rwa'))
-       elif self.path=='/api/intelligence-rsi':result=market_intelligence.rsi()
+       elif self.path=='/api/intelligence-rsi':result=market_intelligence.rsi(raw.get('interval','1d'),raw.get('limit',20))
        elif self.path=='/api/intelligence-venues':result=market_intelligence.venues(raw.get('coin_id'))
        elif self.path=='/api/intelligence-flow':result=market_microstructure.microstructure(raw.get('coin_id'))
        elif self.path=='/api/intelligence-exposures':result=market_microstructure.exposures(raw.get('coin_id'))
        elif self.path=='/api/intelligence-derivatives':result=market_microstructure.derivatives(raw.get('coin_id'))
        else:result=protocol_data.fundamentals(raw.get('coin_id'))
       self.send(200,result);return
+     if self.path=='/api/alert-email-preferences':
+      result=alert_email.preference(c,uid,raw);c.commit();self.send(200,result);return
+     if self.path=='/api/alert-email-deliver':
+      self.send(200,alert_email.deliver(c,uid));return
      if self.path=='/api/coin-alert-list':self.send(200,coin_alerts.state(c,uid,raw.get('coin_id')));return
      if self.path in ('/api/coin-alert-save','/api/coin-alert-check','/api/coin-alert-delete'):
       prepared=None
@@ -338,7 +343,7 @@ class Handler(BaseHTTPRequestHandler):
       if self.path=='/api/coin-alert-save':coin_alerts.save(c,uid,raw,prepared);result=coin_alerts.state(c,uid,raw.get('coin_id'))
       elif self.path=='/api/coin-alert-check':result=coin_alerts.evaluate(c,uid,prepared)
       else:result=coin_alerts.remove(c,uid,raw)
-      c.commit();self.send(200,result);return
+      c.commit();result['delivery']=alert_email.deliver(c,uid);self.send(200,result);return
      if self.path in ('/api/profile','/api/learning-notes','/api/exchange-state','/api/chart-setup-load'):
       result={'/api/profile':lambda:account_features.state(c,uid),'/api/learning-notes':lambda:account_features.notes(c,uid),'/api/exchange-state':lambda:exchange_connections.state(c,uid),'/api/chart-setup-load':lambda:workspace_features.load(c,uid,raw)}[self.path]()
       self.send(200,result);return
@@ -372,7 +377,7 @@ class Handler(BaseHTTPRequestHandler):
       wallets=snapshots(c,uid);quotes=metadata(c,uid)
       target=price_targets.save(c,uid,raw,wallets,quotes)
       evaluation=price_targets.evaluate(c,uid,wallets,quotes)
-      c.commit();self.send(200,{'ok':True,'target':target,'evaluation':evaluation});return
+      c.commit();delivery=alert_email.deliver(c,uid);self.send(200,{'ok':True,'target':target,'evaluation':evaluation,'email_delivery':delivery});return
      elif self.path=='/api/target-remove':
       result=price_targets.remove(c,uid,raw)
       c.commit();self.send(200,{'ok':True,**result});return
@@ -457,6 +462,8 @@ class Handler(BaseHTTPRequestHandler):
      elif self.path=='/api/refresh-prices':
       symbols=[r[0] for r in c.execute('SELECT DISTINCT symbol FROM trades WHERE user_id=?',(uid,))]
       symbols+= [v[0] for v in providers.CHAINS.values()]
+      mail_rules=coin_alerts.state(c,uid)['alerts']
+      symbols += [r['symbol'] for r in mail_rules if providers.COINS.get(r['symbol'])==r['coin_id']]
       quotes=providers.market_prices(symbols)
       if not quotes: raise ValueError('No price quotes returned. Please retry later.')
       with coin_market.persistence(market_cache_read,market_cache_write):exchange_updates=exchange_connections.reprice_snapshots(c,uid)
@@ -472,8 +479,11 @@ class Handler(BaseHTTPRequestHandler):
        c.execute('INSERT OR REPLACE INTO prices VALUES (?,?,?)',(uid,symbol,quote['price']))
        c.execute('INSERT OR REPLACE INTO price_metadata VALUES (?,?,?,?)',(uid,symbol,quote['source'],quote['updated_at']))
       evaluation=price_targets.evaluate(c,uid,snapshots(c,uid),metadata(c,uid))
+      for identity in {r['coin_id'] for r in mail_rules}:
+       symbol=next((r['symbol'] for r in mail_rules if r['coin_id']==identity and providers.COINS.get(r['symbol'])==identity),None)
+       if symbol in quotes:coin_alerts.evaluate(c,uid,{'coin':{'id':identity,'current_price':quotes[symbol]['price'],'last_updated':quotes[symbol]['updated_at']}})
       portfolio_daily.record(c,uid,snapshots(c,uid),metadata(c,uid),exchange_connections.state(c,uid)['connections'])
-      c.commit();self.send(200,{'ok':True,'target_evaluation':evaluation});return
+      c.commit();delivery=alert_email.deliver(c,uid);self.send(200,{'ok':True,'target_evaluation':evaluation,'email_delivery':delivery});return
      elif self.path=='/api/remove-wallet':
       wallet=c.execute('SELECT id FROM wallets WHERE user_id=? AND id=?',(uid,raw['id'])).fetchone()
       if not wallet: raise ValueError('Wallet not found')

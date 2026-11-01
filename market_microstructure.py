@@ -62,14 +62,15 @@ def microstructure(coin_id,venue='binance'):
   spot_metadata(base)
   rows=providers.request_json('https://data-api.binance.vision/api/v3/trades?'+urlencode({'symbol':pair,'limit':100}))
   if not isinstance(rows,list) or len(rows)>100:raise ValueError('Invalid recent trades')
-  out=[];seen=set();observed=[]
+  out=[];sample=[];seen=set();observed=[]
   for row in rows:
    if not isinstance(row,dict) or not isinstance(row.get('id'),int) or isinstance(row['id'],bool) or type(row.get('isBuyerMaker')) is not bool:raise ValueError('Invalid trade identity')
    ts=timestamp(row.get('time'));price=positive(row.get('price'));qty=positive(row.get('qty'));notional=price*qty
    if row['id'] in seen:continue
    seen.add(row['id']);observed.append(ts)
-   if notional>=100000:out.append({'id':row['id'],'timestamp':ts,'price':str(price),'quantity':str(qty),'notional':str(notional),'direction':'sell' if row['isBuyerMaker'] else 'buy'})
-  return {'source':'Binance','trades':sorted(out,key=lambda r:r['timestamp'],reverse=True),'threshold':'100000','sample_size':len(seen),'observed_from':min(observed) if observed else None,'observed_to':max(observed) if observed else None,'coverage':'Executed trades of at least 100,000 USDT in the latest 100-trade sample, refreshed on request. Direction is taker/aggressor side. Not wallet identification, on-chain whale alerts, a complete time window, or background monitoring. USDT is not USD.'}
+   trade={'id':row['id'],'timestamp':ts,'price':str(price),'quantity':str(qty),'notional':str(notional),'direction':'sell' if row['isBuyerMaker'] else 'buy'};sample.append(trade)
+   if notional>=100000:out.append(trade)
+  return {'source':'Binance','sample_trades':sorted(sample,key=lambda r:r['timestamp']),'trades':sorted(out,key=lambda r:r['timestamp'],reverse=True),'threshold':'100000','sample_size':len(seen),'observed_from':min(observed) if observed else None,'observed_to':max(observed) if observed else None,'coverage':'Executed trades of at least 100,000 USDT in the latest 100-trade sample, refreshed on request. Direction is taker/aggressor side. Not wallet identification, on-chain whale alerts, a complete time window, or background monitoring. USDT is not USD.'}
  return {'coin_id':coin,'orderbook':feed(('book',coin),book,**context),'large_trades':feed(('trades',coin),trades,**context)}
 
 def ratio(long,short,stamp):

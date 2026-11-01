@@ -1,3 +1,4 @@
+import alert_email
 """In-app USD price targets evaluated only against saved, fresh identity-bound quotes."""
 import json,time,uuid
 from decimal import Decimal
@@ -8,6 +9,7 @@ MAX_TARGETS=30
 MAX_EVENTS=200
 
 def init(c):
+ alert_email.init(c)
  c.execute('CREATE TABLE IF NOT EXISTS price_targets (id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,data TEXT NOT NULL)')
  c.execute('CREATE INDEX IF NOT EXISTS price_targets_user ON price_targets(user_id)')
  c.execute('CREATE TABLE IF NOT EXISTS price_target_events (id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,target_id TEXT NOT NULL,created_at INTEGER NOT NULL,data TEXT NOT NULL)')
@@ -84,6 +86,7 @@ def evaluate(c,uid,wallets,quotes):
    event={k:target[k] for k in ('asset_id','symbol','chain','contract','operator','target_usd')}
    event.update(id=str(uuid.uuid4()),target_id=target['id'],price_usd=str(price),quote_at=stamp,source=source,created_at=now)
    c.execute('INSERT INTO price_target_events(id,user_id,target_id,created_at,data) VALUES (?,?,?,?,?)',(event['id'],uid,target['id'],now,json.dumps(event)))
+   alert_email.enqueue(c,uid,event)
    count+=1;triggered+=1
   c.execute('UPDATE price_targets SET data=? WHERE user_id=? AND id=?',(json.dumps(target),uid,target['id']))
  return {'evaluated':evaluated,'triggered':triggered,'event_limit_reached':limited or count>=MAX_EVENTS}

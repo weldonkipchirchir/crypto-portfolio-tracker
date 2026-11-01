@@ -142,26 +142,48 @@ def daily_rsi(payload,now=None):
  if len(ordered)<15 or ordered[-1]!=(now//86400-1)*86400000:raise ValueError('Missing or outdated daily candles')
  return wilder([points[t] for t in ordered]),ordered[-1]//1000
 
-def rsi():
+def interval_rsi(payload,interval,now=None):
+ if interval=='1d':return daily_rsi(payload,now)
+ now=int(time.time()) if now is None else now;seconds={'1h':3600,'4h':14400}[interval]
+ if payload.get('stale') or payload.get('interval_code')!=interval:raise ValueError('Fresh matching interval required')
+ raw=payload.get('candles')
+ if not isinstance(raw,list) or len(raw)>1000:raise ValueError('Invalid candle sample')
+ points={}
+ for row in raw:
+  if not isinstance(row,dict):continue
+  ts=m.numeric(row.get('timestamp'));close=m.numeric(row.get('close'))
+  if ts is None or close is None:continue
+  stamp=Decimal(ts)
+  if stamp==stamp.to_integral_value() and stamp%(seconds*1000)==0 and 1230768000000<=stamp and stamp/1000+seconds<=now:points[int(stamp)]=close
+ ordered=sorted(points);start=0
+ for i in range(1,len(ordered)):
+  if ordered[i]-ordered[i-1]!=seconds*1000:start=i
+ ordered=ordered[start:]
+ if len(ordered)<15 or ordered[-1]!=(now//seconds-1)*seconds*1000:raise ValueError('Missing or outdated closed candles')
+ return wilder([points[t] for t in ordered]),ordered[-1]//1000
+
+def rsi(interval='1d',limit=8):
+ if interval not in ('1h','4h','1d') or type(limit) is not int or limit not in (8,20):raise ValueError('Choose 1H, 4H or 1D and 8 or 20 assets')
+ assets=(list(RSI_ASSETS)+[coin for coin in exchange_charts.ASSETS if coin not in RSI_ASSETS])[:limit]
  def load():
   from concurrent.futures import ThreadPoolExecutor
   from contextlib import nullcontext
   callbacks=getattr(m.STORE,'callbacks',None);cutoff=getattr(providers._REQUEST_CONTEXT,'cutoff',None) or time.monotonic()+25
-  # Bounded parallelism; preserve request deadline and public-cache persistence.
   def observe(identity):
    with providers.deadline(cutoff), (m.persistence(*callbacks) if callbacks else nullcontext()):
     row={'coin_id':identity,'symbol':exchange_charts.ASSETS[identity],'available':False,'value':None,'signal':None,'source':None,'pair':None,'observed_at':None}
     for source in ('binance','coinbase'):
      try:
-      payload=exchange_charts.chart(identity,90,'candles',source);value,stamp=daily_rsi(payload)
+      payload=exchange_charts.chart(identity,90,'candles',source) if interval=='1d' else exchange_charts.chart(identity,7 if interval=='1h' else 30,'candles',source,interval)
+      value,stamp=interval_rsi(payload,interval)
       row.update(available=True,value=round(value,2),signal='overbought' if value>=70 else 'oversold' if value<=30 else 'neutral',source=payload.get('source'),pair=payload.get('pair'),observed_at=stamp);break
      except ValueError:pass
-    if not row['available']:row['error']='Verified consecutive daily candles unavailable.'
+    if not row['available']:row['error']='Verified consecutive closed candles unavailable.'
     return row
-  with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(observe,RSI_ASSETS))
-  if not any(r['available'] for r in rows):raise ValueError('Daily RSI providers unavailable')
-  return {'rows':rows,'period':14,'interval':'daily','source':'Exchange spot candles','coverage':'Wilder RSI(14), latest completed UTC daily candle, eight curated spot assets. Binance USDT with Coinbase USD fallback; venue and pair are shown per asset. At least 15 consecutive closes required; no interpolated gaps. Overbought >=70, oversold <=30; not a trade recommendation.'}
- return m.cached(('fundamentals','intelligence-rsi'),900,load)
+  with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(observe,assets))
+  if not any(r['available'] for r in rows):raise ValueError('RSI providers unavailable')
+  return {'rows':rows,'period':14,'interval':{'1h':'hourly','4h':'4-hour','1d':'daily'}[interval],'interval_code':interval,'source':'Exchange spot candles','coverage':'Wilder RSI(14), completed UTC candles for '+str(len(assets))+' curated spot assets. Binance USDT with Coinbase USD fallback. At least 15 consecutive closes; no interpolated gaps. Not a trade recommendation.'}
+ return m.cached(('fundamentals','intelligence-rsi-v2',interval,limit),300 if interval!='1d' else 900,load)
 
 def alt_season():
  def load():
