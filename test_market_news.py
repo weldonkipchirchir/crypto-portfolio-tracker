@@ -4,6 +4,7 @@ import coin_market as m,market_news as n
 class NewsTests(unittest.TestCase):
  def setUp(self):
   m.CACHE.clear();m.FAILURES.clear()
+  rss=patch('market_news.feed_news',return_value={'articles':[],'available':False});rss.start();self.addCleanup(rss.stop)
   self.env=patch.dict(os.environ,{'NEWS_API_KEY':'fixture-secret','VERCEL':'','NEWS_API_PRODUCTION_LICENSED':''});self.env.start();self.addCleanup(self.env.stop)
   self.ids=patch('coin_market.allowed',return_value='bitcoin');self.ids.start();self.addCleanup(self.ids.stop)
   self.rows=patch('coin_market.listings',return_value={'coins':[{'id':'bitcoin','name':'Bitcoin','symbol':'BTC'}]});self.rows.start();self.addCleanup(self.rows.stop)
@@ -37,3 +38,27 @@ class NewsTests(unittest.TestCase):
    with patch('providers.request_json',return_value=payload):
     with self.assertRaises(ValueError):n.news('bitcoin')
 if __name__=='__main__':unittest.main()
+
+
+class PublisherFeedTests(unittest.TestCase):
+ def setUp(self):m.CACHE.clear();m.FAILURES.clear()
+ def feed(self):
+  from email.utils import formatdate
+  return ('<rss><channel><item><title>Bitcoin adoption grows</title><link>https://publisher.test/bitcoin</link><pubDate>'+formatdate(time.time(),usegmt=True)+'</pubDate><description>Do not store full text</description></item><item><title>Bitcoin adoption grows</title><link>https://publisher.test/bitcoin</link><pubDate>'+formatdate(time.time(),usegmt=True)+'</pubDate></item><item><title>Unsafe</title><link>javascript:alert(1)</link><pubDate>'+formatdate(time.time(),usegmt=True)+'</pubDate></item></channel></rss>').encode()
+ def test_feed_is_metadata_only_and_deduplicated(self):
+  rows=n.parse_feed(self.feed(),'Publisher');self.assertEqual(len(rows),1);self.assertEqual(rows[0]['source'],'Publisher');self.assertNotIn('description',str(rows));self.assertNotIn('full text',str(rows))
+ def test_malformed_xml_entities_size_and_source_guards(self):
+  for body in [b'<broken',b'<!DOCTYPE rss [<!ENTITY x "secret">]><rss/>',b'x'*750001]:
+   with self.assertRaises(ValueError):n.parse_feed(body,'Publisher')
+  with self.assertRaises(ValueError):n.read_feed('http://127.0.0.1/private')
+ def test_general_news_does_not_require_market_listing(self):
+  with patch('market_news.read_feed',return_value=self.feed()),patch('coin_market.allowed',side_effect=AssertionError('No coin identity required')):data=n.news()
+  self.assertTrue(data['available']);self.assertEqual(len(data['articles']),1);self.assertIn(data['articles'][0]['source'],['CoinDesk','Cointelegraph'])
+ def test_one_feed_outage_keeps_other_headlines(self):
+  def read(url):
+   if 'coindesk' in url:raise ValueError('unavailable')
+   return self.feed()
+  with patch('market_news.read_feed',side_effect=read):data=n.feed_news('bitcoin','Bitcoin',{})
+  self.assertTrue(data['available']);self.assertEqual(data['articles'][0]['source'],'Cointelegraph')
+ def test_coin_name_filter_does_not_match_namesakes(self):
+  with patch('market_news.read_feed',return_value=self.feed()):self.assertEqual(n.feed_news('bitcoin-cash','Bitcoin Cash',{})['articles'],[])

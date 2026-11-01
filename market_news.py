@@ -1,11 +1,14 @@
 """Optional licensed headline API; no article bodies or publisher feed scraping."""
-import os,re,time,datetime
+import os,re,time,datetime,urllib.request,urllib.error,xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlencode
 import coin_market as market
 import providers
 
 
-def news(coin_id):
+def news(coin_id=None):
+ if coin_id is None:return feed_news('all',None,{'coin_id':None,'search_links':[]})
  identity=market.allowed(coin_id)
  try:coin=next((c for c in market.listings()['coins'] if c['id']==identity),None)
  except ValueError:coin=None
@@ -42,6 +45,8 @@ def news(coin_id):
 
 def public_news(identity,name,base):
  """Public GDELT index metadata only; articles remain on publishers' sites."""
+ rss=feed_news(identity,name,base)
+ if rss.get("articles"):return rss
  def load():
   # Strip query operators from provider-supplied names before using a quoted phrase.
   phrase=re.sub(r'[^\w .-]','',name)[:100]
@@ -59,3 +64,49 @@ def public_news(identity,name,base):
   return {**base,'source':'GDELT','source_url':'https://www.gdeltproject.org/','available':True,'articles':sorted(articles,key=lambda a:a['published_at'],reverse=True)[:12],'coverage':'GDELT public news index · English title matches over 7 days. Dates indicate first observed by the index, not verified publication time. Open the publisher for the full report; keyword matches may be unrelated.'}
  try:return market.cached(('fundamentals','public-news',identity),1800,load)
  except ValueError:return {**base,'source':'GDELT','available':False,'articles':[],'fetched_at':int(time.time()),'stale':False,'coverage':'The public news index is temporarily unavailable or rate limited. Open coin news search below or retry later.'}
+
+
+FEEDS=(('CoinDesk','https://www.coindesk.com/arc/outboundfeeds/rss/'),('Cointelegraph','https://cointelegraph.com/rss'))
+
+def read_feed(url):
+ if url not in {u for _,u in FEEDS}:raise ValueError('Unsupported news feed')
+ try:
+  request=urllib.request.Request(url,headers={'User-Agent':'OrbitPortfolio/1.0 (headline reader)','Accept':'application/rss+xml, application/xml, text/xml'})
+  with urllib.request.urlopen(request,timeout=8) as response:
+   body=response.read(750001)
+  if len(body)>750000:raise ValueError('News feed is too large')
+  return body
+ except (OSError,urllib.error.URLError,TimeoutError):raise ValueError('News feed unavailable') from None
+
+def parse_feed(body,source,now=None):
+ if not isinstance(body,bytes) or len(body)>750000 or b'<!DOCTYPE' in body.upper() or b'<!ENTITY' in body.upper():raise ValueError('Invalid news feed')
+ try:root=ET.fromstring(body)
+ except ET.ParseError:raise ValueError('Invalid news feed') from None
+ now=time.time() if now is None else now;articles=[];seen=set()
+ for row in root.findall('./channel/item')[:100]:
+  title=market.text(row.findtext('title'),240);url=market.url(row.findtext('link'))
+  try:published=parsedate_to_datetime(row.findtext('pubDate') or '').timestamp()
+  except (ValueError,TypeError,OverflowError,AttributeError):continue
+  if not title or not url or not now-14*86400<=published<=now+60 or url in seen or title.casefold() in seen:continue
+  seen.update((url,title.casefold()));articles.append({'title':title,'url':url,'source':source,'published_at':int(published)})
+ return articles
+
+def feed_news(identity,name,base):
+ def load():
+  def fetch(feed):
+   source,url=feed
+   try:return parse_feed(read_feed(url),source)
+   except ValueError:return []
+  with ThreadPoolExecutor(max_workers=2) as pool:groups=list(pool.map(fetch,FEEDS))
+  articles=[];seen=set()
+  for article in sorted([a for group in groups for a in group],key=lambda a:a['published_at'],reverse=True):
+   if article['url'] in seen or article['title'].casefold() in seen:continue
+   seen.update((article['url'],article['title'].casefold()));articles.append(article)
+  if not articles:raise ValueError('Publisher headline feeds unavailable')
+  return {'articles':articles[:50],'source':'Publisher RSS','available':True,'coverage':'Publisher-provided headlines and publication dates. Articles open on the original publisher website; no article bodies are copied. Coin matches use names in headlines and may be incomplete.'}
+ try:data=market.cached(('fundamentals','publisher-news-v1'),600,load)
+ except ValueError:return {**base,'articles':[],'source':'Publisher RSS','available':False,'fetched_at':int(time.time()),'coverage':'Publisher feeds are temporarily unavailable. Retry later.'}
+ articles=data['articles']
+ if name:
+  pattern=re.compile(r'(?<!\w)'+re.escape(name)+r'(?!\w)',re.I);articles=[a for a in articles if pattern.search(a['title'])]
+ return {**base,**data,'articles':articles[:12]}
