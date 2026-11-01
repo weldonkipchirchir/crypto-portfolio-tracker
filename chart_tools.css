@@ -51,3 +51,5 @@
 .ot-visible-range{font-size:11px;line-height:1.7;color:var(--muted);margin:8px 0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 
 .ot-history-shortcuts{display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%;padding:8px 10px;box-sizing:border-box;background:var(--bg);border:1px solid var(--line,var(--border));border-radius:10px}.ot-history-shortcuts small{font-size:10px;color:var(--muted);margin-left:auto}@media(max-width:700px){.ot-history-shortcuts .ot-group-label{width:100%}.ot-history-shortcuts small{width:100%;margin:3px 0}.ot-history-shortcuts button{flex:1;min-height:44px;white-space:nowrap;padding:8px}}
+
+.ot-pan-control{display:flex;align-items:center;gap:14px;font-size:11px;color:var(--muted);margin:10px 0}.ot-dialog .ot-pan-control input{flex:1;width:auto;padding:0;accent-color:#20b9a6;min-height:28px}.ot-chart svg{overscroll-behavior-x:contain}@media(max-width:700px){.ot-pan-control{flex-wrap:wrap;gap:4px}.ot-pan-control input{min-width:100%}}
