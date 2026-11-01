@@ -79,7 +79,7 @@ def read_feed(url):
  except (OSError,urllib.error.URLError,TimeoutError):raise ValueError('News feed unavailable') from None
 
 def parse_feed(body,source,now=None):
- if not isinstance(body,bytes) or len(body)>750000 or b'<!DOCTYPE' in body.upper() or b'<!ENTITY' in body.upper():raise ValueError('Invalid news feed')
+ if not isinstance(body,bytes) or len(body)>750000 or b'\x00' in body or b'<!DOCTYPE' in body.upper() or b'<!ENTITY' in body.upper():raise ValueError('Invalid news feed')
  try:root=ET.fromstring(body)
  except ET.ParseError:raise ValueError('Invalid news feed') from None
  now=time.time() if now is None else now;articles=[];seen=set()

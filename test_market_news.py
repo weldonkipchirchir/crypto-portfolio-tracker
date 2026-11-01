@@ -48,7 +48,7 @@ class PublisherFeedTests(unittest.TestCase):
  def test_feed_is_metadata_only_and_deduplicated(self):
   rows=n.parse_feed(self.feed(),'Publisher');self.assertEqual(len(rows),1);self.assertEqual(rows[0]['source'],'Publisher');self.assertNotIn('description',str(rows));self.assertNotIn('full text',str(rows))
  def test_malformed_xml_entities_size_and_source_guards(self):
-  for body in [b'<broken',b'<!DOCTYPE rss [<!ENTITY x "secret">]><rss/>',b'x'*750001]:
+  for body in [b'<broken',b'\x00<rss/>',b'<!DOCTYPE rss [<!ENTITY x "secret">]><rss/>',b'x'*750001]:
    with self.assertRaises(ValueError):n.parse_feed(body,'Publisher')
   with self.assertRaises(ValueError):n.read_feed('http://127.0.0.1/private')
  def test_general_news_does_not_require_market_listing(self):
