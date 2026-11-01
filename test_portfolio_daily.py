@@ -18,6 +18,9 @@ class DailyTests(unittest.TestCase):
  def test_incomplete_coverage_and_first_day(self):
   self.save('2026-01-01',100);self.save('2026-01-02',120,unknown=True)
   days=portfolio_daily.calendar(self.c,1)['days'];self.assertIsNone(days[0]['change']);self.assertIsNone(days[1]['change'])
+ def test_stable_partial_coverage_compares_known_value(self):
+  self.save('2026-01-01',100,unknown=True);self.save('2026-01-02',110,unknown=True)
+  row=portfolio_daily.calendar(self.c,1)['days'][-1];self.assertEqual(row['change'],'10');self.assertTrue(row['partial'])
  def test_wallet_exchange_combination_and_account_dedup(self):
   wallets=[{'chain':'Ethereum','address':'0xabc','snapshot':{'quantity':'2'}}]
   exchange={'id':'a','snapshot':{'account_key':'same','balances':[{'asset':'BTC','quantity':'1','value_usd':'100'}]}}
