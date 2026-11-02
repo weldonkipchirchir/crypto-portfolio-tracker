@@ -25,3 +25,5 @@ STATIC_FILES["/portfolio_overview.js"]=("portfolio_overview.js","text/javascript
 STATIC_FILES["/portfolio_performance.js"]=("portfolio_performance.js","text/javascript; charset=utf-8")
 
 STATIC_FILES['/market_discovery.js']=('market_discovery.js','text/javascript; charset=utf-8')
+
+STATIC_FILES['/footprint_ui.js']=('footprint_ui.js','text/javascript; charset=utf-8')

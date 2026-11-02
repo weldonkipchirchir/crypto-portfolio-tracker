@@ -14,6 +14,7 @@ import market_quotes
 import protocol_data
 import market_news
 import market_intelligence
+import market_footprint
 import market_microstructure
 import coin_alerts
 import account_features
@@ -299,7 +300,7 @@ class Handler(BaseHTTPRequestHandler):
      self.send_response(200); self.send_header('Set-Cookie','session='+token+'; HttpOnly; SameSite=Strict; Path=/; Max-Age=86400'+('; Secure' if os.environ.get('ORBIT_SECURE_COOKIE')=='1' else '')); self.send_header('Content-Type','application/json'); self.end_headers(); self.wfile.write(b'{"ok":true}'); return
     uid=self.user(c)
     if not uid: self.send(401,{'error':'Sign in to continue'}); return
-    market_action=self.path in ('/api/market-quote','/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news','/api/intelligence-overview','/api/intelligence-narrative','/api/intelligence-rsi','/api/intelligence-venues','/api/intelligence-flow','/api/intelligence-derivatives','/api/intelligence-exposures')
+    market_action=self.path in ('/api/market-quote','/api/market-listings','/api/market-detail','/api/market-chart','/api/market-fundamentals','/api/market-news','/api/intelligence-overview','/api/intelligence-narrative','/api/intelligence-rsi','/api/intelligence-venues','/api/intelligence-flow','/api/intelligence-derivatives','/api/intelligence-exposures','/api/intelligence-footprint','/api/intelligence-top-traders')
     if market_action:budget=__import__('cloud_storage').provider_action(uid,kind='market',limit=60,max_concurrent=4) if os.environ.get('DATABASE_URL') else MARKET_BUDGET.action(uid)
     else:budget=(__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)) if self.path in ('/api/sync','/api/refresh-prices','/api/wallet-details','/api/history','/api/discover-tokens','/api/market-watch-toggle') else nullcontext()
     with budget, providers.deadline(time.monotonic()+30):
@@ -321,6 +322,8 @@ class Handler(BaseHTTPRequestHandler):
        elif self.path=='/api/intelligence-narrative':result=market_intelligence.narratives(raw.get('slug','rwa'))
        elif self.path=='/api/intelligence-rsi':result=market_intelligence.rsi(raw.get('interval','1d'),raw.get('limit',20))
        elif self.path=='/api/intelligence-venues':result=market_intelligence.venues(raw.get('coin_id'))
+       elif self.path=='/api/intelligence-footprint':result=market_footprint.footprint(raw.get('coin_id','bitcoin'),raw.get('venue','perp'),raw.get('interval','1m'),raw.get('row_size','auto'))
+       elif self.path=='/api/intelligence-top-traders':result=market_footprint.top_traders(raw.get('coin_id','bitcoin'),raw.get('period','1h'))
        elif self.path=='/api/intelligence-flow':result=market_microstructure.microstructure(raw.get('coin_id'),raw.get('venue','binance'))
        elif self.path=='/api/intelligence-exposures':result=market_microstructure.exposures(raw.get('coin_id'))
        elif self.path=='/api/intelligence-derivatives':result=market_microstructure.derivatives(raw.get('coin_id'))
