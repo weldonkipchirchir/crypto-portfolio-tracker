@@ -60,3 +60,9 @@
 :root{--text:#edf3ef}:root[data-theme="light"]{--text:#1b2b23}
 
 .fp-actions{flex-wrap:wrap}
+
+/* Bounded drift preserves the bubble layout and pauses for selection. */
+.discovery-bubble{animation:discovery-float var(--bubble-duration,9s) ease-in-out var(--bubble-delay,0s) infinite;transform-box:fill-box;transform-origin:center}
+.discovery-bubbles:hover .discovery-bubble,.discovery-bubbles:focus-within .discovery-bubble{animation-play-state:paused}
+@keyframes discovery-float{0%,100%{transform:translate(0,0)}25%{transform:translate(3px,-4px)}50%{transform:translate(-2px,-2px)}75%{transform:translate(-3px,3px)}}
+@media(prefers-reduced-motion:reduce){.discovery-bubble{animation:none}}
