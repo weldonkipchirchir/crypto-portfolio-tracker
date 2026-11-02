@@ -132,4 +132,33 @@ def top_traders(coin_id='bitcoin',period='1h'):
    return {'history':history,'latest':history[-1],'source':'Binance USDT Perpetual'}
   try:feeds[kind]=dict(market.cached(('fundamentals','top-traders-v1',kind,coin,period),60,load),available=True)
   except ValueError:feeds[kind]={'available':False,'message':'Binance top-trader feed unavailable. Regional restrictions, rate limits or an API-key requirement may apply. No ratio is estimated.'}
- return {'coin_id':coin,'pair':pair,'period':period,**feeds,'coverage':'Binance top 20% users by margin balance. Accounts count each net-long/net-short account once; positions measure the group’s reported net-long/net-short position proportions. These are distinct cohorts/metrics, not named traders, all-market exposure or a prediction. Up to 30 observations per feed; no missing intervals are interpolated.'}
+ return {'coin_id':coin,'pair':pair,'period':period,**feeds,'coverage':'Binance top 20% users by margin balance. Accounts count each net-long/net-short account once; positions measure the groupâ€™s reported net-long/net-short position proportions. These are distinct cohorts/metrics, not named traders, all-market exposure or a prediction. Up to 30 observations per feed; no missing intervals are interpolated.'}
+
+
+def candle_history(coin_id='bitcoin',venue='perp',days='30'):
+ if not isinstance(venue,str) or venue not in ('spot','perp'):raise ValueError('Unsupported footprint market')
+ if str(days) not in ('1','7','30','365','max'):raise ValueError('Unsupported footprint history range')
+ coin,base=identity(coin_id);days=str(days)
+ interval={'1':'1m','7':'15m','30':'1h','365':'1d','max':'1w'}[days]
+ seconds=exchange.INTERVALS[interval]
+ def load():
+  meta=product(base,venue);now=int(time.time());start=0 if days=='max' else now-int(days)*86400
+  root='https://data-api.binance.vision/api/v3/klines' if venue=='spot' else 'https://fapi.binance.com/fapi/v1/klines'
+  points={};cursor=start*1000;done=False
+  for page in range(6):
+   rows=providers.request_json(root+'?'+urlencode({'symbol':meta['pair'],'interval':interval,'startTime':cursor,'endTime':now*1000,'limit':1000}))
+   if not isinstance(rows,list) or len(rows)>1000:raise ValueError('Invalid historical candle response')
+   for row in rows:
+    point=exchange.candle(row,'binance',cursor,now*1000+60000)
+    if point is None or any(Decimal(point[k])<=0 for k in ('open','high','low','close')):raise ValueError('Invalid historical OHLC candle')
+    points[point['timestamp']]=point
+   if len(rows)<1000:done=True;break
+   next_cursor=max(points)+seconds*1000
+   if next_cursor<=cursor:raise ValueError('Historical candle pagination did not advance')
+   cursor=next_cursor
+   if cursor>now*1000:done=True;break
+  if not done:raise ValueError('History exceeds the bounded candle window')
+  candles=[points[k] for k in sorted(points)]
+  if not candles:raise ValueError('No historical candles available')
+  return {'available':True,'candles':candles,'interval':interval,'venue':venue,'pair':meta['pair'],'source':meta['source'],'coverage':'Available '+meta['source']+' '+meta['pair']+' '+interval+' candles. Exchange-pair history only; historical bid/ask footprints are not available. Latest candle may be forming.'}
+ return market.cached(('chart','footprint-history-v1',coin,venue,days),60 if days=='1' else 300,load)

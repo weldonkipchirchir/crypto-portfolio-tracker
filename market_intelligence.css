@@ -66,3 +66,7 @@
 .discovery-bubbles:hover .discovery-bubble,.discovery-bubbles:focus-within .discovery-bubble{animation-play-state:paused}
 @keyframes discovery-float{0%,100%{transform:translate(0,0)}25%{transform:translate(3px,-4px)}50%{transform:translate(-2px,-2px)}75%{transform:translate(-3px,3px)}}
 @media(prefers-reduced-motion:reduce){.discovery-bubble{animation:none}}
+
+.fp-zoom-controls{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:16px 0}.fp-zoom-controls label{display:grid;gap:6px;color:var(--muted);font-size:12px}.fp-zoom-controls select{padding:10px;border-radius:8px;background:var(--bg);color:var(--text);border:1px solid var(--line)}.fp-history-chart{width:100%;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:12px}.fp-history-chart svg{display:block;width:100%;min-height:280px}.fp-history-chart text{fill:var(--text);font:11px system-ui}.fp-history-chart [role=button]{cursor:pointer}@media(max-width:650px){.fp-history-chart{overflow-x:auto}.fp-history-chart svg{min-width:650px}}
+
+.fp-history-mode .fp-controls>label:nth-child(n+2):nth-child(-n+7),.fp-history-mode .fp-indicators{display:none}

@@ -322,7 +322,7 @@ class Handler(BaseHTTPRequestHandler):
        elif self.path=='/api/intelligence-narrative':result=market_intelligence.narratives(raw.get('slug','rwa'))
        elif self.path=='/api/intelligence-rsi':result=market_intelligence.rsi(raw.get('interval','1d'),raw.get('limit',20))
        elif self.path=='/api/intelligence-venues':result=market_intelligence.venues(raw.get('coin_id'))
-       elif self.path=='/api/intelligence-footprint':result=market_footprint.footprint(raw.get('coin_id','bitcoin'),raw.get('venue','perp'),raw.get('interval','1m'),raw.get('row_size','auto'))
+       elif self.path=='/api/intelligence-footprint':result=market_footprint.candle_history(raw.get('coin_id','bitcoin'),raw.get('venue','perp'),raw['history_days']) if raw.get('history_days') is not None else market_footprint.footprint(raw.get('coin_id','bitcoin'),raw.get('venue','perp'),raw.get('interval','1m'),raw.get('row_size','auto'))
        elif self.path=='/api/intelligence-top-traders':result=market_footprint.top_traders(raw.get('coin_id','bitcoin'),raw.get('period','1h'))
        elif self.path=='/api/intelligence-flow':result=market_microstructure.microstructure(raw.get('coin_id'),raw.get('venue','binance'))
        elif self.path=='/api/intelligence-exposures':result=market_microstructure.exposures(raw.get('coin_id'))

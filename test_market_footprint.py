@@ -14,6 +14,23 @@ class FootprintTests(unittest.TestCase):
  def sample(self):
   rows=[self.trade(1,BASE-1000,99,1,'sell'),self.trade(2,BASE+100,100,2,'buy'),self.trade(3,BASE+200,101,3,'sell'),self.trade(4,BASE+300,102,4,'buy'),self.trade(5,BASE+60100,103,1,'buy')]
   return {'trades':rows,'observed_from':rows[0]['timestamp'],'observed_to':rows[-1]['timestamp'],'id_gaps':0}
+
+ def test_historical_candles_are_verified_and_venue_specific(self):
+  row=[BASE,'100','103','99','102','2',BASE+59999,'204',3,'1','102','0']
+  with patch.object(f.providers,'request_json',return_value=[row]) as request:
+   result=f.candle_history('bitcoin','perp','1')
+   self.assertEqual(result['interval'],'1m');self.assertEqual(result['candles'][0]['close'],'102')
+   self.assertIn('fapi.binance.com/fapi/v1/klines',request.call_args[0][0])
+   self.assertIn('historical bid/ask footprints are not available',result['coverage'])
+  with patch.object(f.providers,'request_json',return_value=[row]) as request:
+   result=f.candle_history('bitcoin','spot','max')
+   self.assertEqual(result['interval'],'1w');self.assertIn('startTime=0',request.call_args[0][0])
+   self.assertIn('data-api.binance.vision',request.call_args[0][0])
+ def test_historical_candles_reject_invalid_ohlc_and_options(self):
+  for venue,days in [('bad','1'),('perp','all'),([], '1')]:
+   with self.assertRaises(ValueError):f.candle_history('bitcoin',venue,days)
+  with patch.object(f.providers,'request_json',return_value=[[BASE,'100','90','99','102','2',0,0,0,0,0,0]]):
+   with self.assertRaises(ValueError):f.candle_history('bitcoin','perp','1')
  def test_volume_delta_vwap_and_coverage(self):
   result=f.aggregate(self.sample(),'1m','1',BASE+300000);bar=result['bars'][1]
   self.assertEqual(bar['volume'],'9');self.assertEqual(bar['delta'],'3');self.assertEqual(bar['buy'],'6');self.assertEqual(bar['sell'],'3');self.assertEqual(bar['notional'],'911');self.assertEqual(bar['prints'],3);self.assertEqual(bar['min_delta'],'-1');self.assertEqual(bar['max_delta'],'3');self.assertEqual(bar['poc'],'102');self.assertTrue(bar['complete']);self.assertFalse(result['bars'][0]['complete']);self.assertFalse(result['bars'][-1]['complete']);self.assertAlmostEqual(float(bar['vwap']),911/9)
