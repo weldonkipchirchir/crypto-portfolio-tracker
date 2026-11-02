@@ -13,6 +13,7 @@ def build(destination=None):
    # The public stylesheet is tiny: inline it to remove the blocking CSS round trip.
    css=(ROOT/'public_site.css').read_bytes()
    body=body.replace(b'<link rel="stylesheet" href="/public_site.css">',b'<style>'+css+b'</style>')
+   if filename=='index.html':body=body.replace(b'<link rel="stylesheet" href="/landing.css">',b'<style>'+(ROOT/'landing.css').read_bytes()+b'</style>')
   if filename=='app.html':
    body=body.replace(b'name="orbit-registration" content="local"',b'name="orbit-registration" content="'+(b'public' if os.environ.get('ORBIT_PUBLIC_REGISTRATION')=='1' else b'restricted')+b'"')
    for old,new in ((b'Local development edition',b'Personal cloud edition'),(b'Local workspace',b'Cloud workspace'),(b'Private local accounts',b'Private cloud accounts'),(b'Development edition',b'Personal preview')):body=body.replace(old,new)
