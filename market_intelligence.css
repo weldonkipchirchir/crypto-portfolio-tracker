@@ -61,10 +61,10 @@
 
 .fp-actions{flex-wrap:wrap}
 
-/* Bounded drift preserves the bubble layout and pauses for selection. */
-.discovery-bubble{animation:discovery-float var(--bubble-duration,9s) ease-in-out var(--bubble-delay,0s) infinite;transform-box:fill-box;transform-origin:center}
-.discovery-bubbles:hover .discovery-bubble,.discovery-bubbles:focus-within .discovery-bubble{animation-play-state:paused}
-@keyframes discovery-float{0%,100%{transform:translate(0,0)}25%{transform:translate(3px,-4px)}50%{transform:translate(-2px,-2px)}75%{transform:translate(-3px,3px)}}
+/* Independent bounded paths allow bubbles to drift across and overlap. */
+.discovery-bubble{animation:discovery-float var(--bubble-duration,40s) ease-in-out var(--bubble-delay,0s) infinite;transform-box:view-box;transform-origin:0 0}
+.discovery-bubble:hover,.discovery-bubble:focus{animation-play-state:paused}
+@keyframes discovery-float{0%,100%{transform:translate(var(--bubble-x0,0px),var(--bubble-y0,0px))}20%{transform:translate(var(--bubble-x1,0px),var(--bubble-y1,0px))}40%{transform:translate(var(--bubble-x2,0px),var(--bubble-y2,0px))}60%{transform:translate(var(--bubble-x3,0px),var(--bubble-y3,0px))}80%{transform:translate(var(--bubble-x4,0px),var(--bubble-y4,0px))}}
 @media(prefers-reduced-motion:reduce){.discovery-bubble{animation:none}}
 
 .fp-zoom-controls{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:16px 0}.fp-zoom-controls label{display:grid;gap:6px;color:var(--muted);font-size:12px}.fp-zoom-controls select{padding:10px;border-radius:8px;background:var(--bg);color:var(--text);border:1px solid var(--line)}.fp-history-chart{width:100%;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:12px}.fp-history-chart svg{display:block;width:100%;min-height:280px}.fp-history-chart text{fill:var(--text);font:11px system-ui}.fp-history-chart [role=button]{cursor:pointer}@media(max-width:650px){.fp-history-chart{overflow-x:auto}.fp-history-chart svg{min-width:650px}}
