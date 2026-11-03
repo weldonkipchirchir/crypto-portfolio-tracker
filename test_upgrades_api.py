@@ -55,6 +55,13 @@ class UpgradeTests(base.APITests):
   self.call(self.a,'import',{'csv':fetched['csv']})
   self.assertEqual(len(self.call(self.a,'state')['trades']),1)
   self.assertEqual(self.call(self.b,'state')['trades'],[])
+ def test_allocation_plan_storage_is_account_scoped(self):
+  key='portfolio-allocation-v1';value={'version':1,'targets':[['connected:exchange:one:BTC',50],['ledger:ledger:BTC',25]]}
+  self.call(self.a,'chart-setup-save',{'key':key,'value':value})
+  self.assertEqual(self.call(self.a,'chart-setup-load',{'key':key})['value'],value)
+  self.assertIsNone(self.call(self.b,'chart-setup-load',{'key':key})['value'])
+  self.call(self.b,'chart-setup-save',{'key':key,'value':{'version':1,'targets':[]}})
+  self.assertEqual(self.call(self.a,'chart-setup-load',{'key':key})['value'],value)
  def test_price_refresh_revalues_exchange_without_resync(self):
   import server,json
   snapshot={'balances':[{'asset':'LDBNB','display_quantity':'1.25','quantity':'1','coin_id':'binancecoin','valuation_basis':'verified_earn_underlying','value_usd':'100'}],'updated_at':123}
