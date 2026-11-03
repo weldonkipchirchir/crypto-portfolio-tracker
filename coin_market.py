@@ -130,16 +130,22 @@ def coin_row(raw):
 
 def listings(force=False):
  def load():
-  payload=request('/coins/markets?'+urlencode({'vs_currency':'usd','order':'market_cap_desc','per_page':250,'page':1,'sparkline':'false','price_change_percentage':'24h,7d,30d'}))
-  if not isinstance(payload,list) or not 1<=len(payload)<=250:raise ValueError('Invalid markets response')
-  seen=set();rows=[]
-  for raw in payload:
-   row=coin_row(raw)
-   if row and row['id'] not in seen:seen.add(row['id']);rows.append(row)
+  seen=set();rows=[];partial=False
+  for page in (1,2):
+   try:
+    payload=request('/coins/markets?'+urlencode({'vs_currency':'usd','order':'market_cap_desc','per_page':250,'page':page,'sparkline':'false','price_change_percentage':'24h,7d,30d'}))
+    if not isinstance(payload,list) or not 1<=len(payload)<=250:raise ValueError('Invalid markets response')
+   except (ValueError,TypeError):
+    if not rows:raise
+    partial=True;break
+   for raw in payload:
+    row=coin_row(raw)
+    if row and row['id'] not in seen:seen.add(row['id']);rows.append(row)
+   if len(payload)<250:break
   if not rows:raise ValueError('No valid market records')
   rows.sort(key=lambda r:(r['market_cap_rank'],r['id']))
-  return {'coins':rows,'availability':dict(AVAILABILITY),'coverage':'Top 250 provider-ranked coins; available rows may be fewer.'}
- return cached(('list','periods-v2'),300,load,force)
+  return {'coins':rows,'availability':dict(AVAILABILITY),'partial':partial,'coverage':'Top 500 provider-ranked coins; '+('additional provider page unavailable; showing available coins.' if partial else 'available rows may be fewer.')}
+ return cached(('list','periods-v3-500'),300,load,force)
 
 def allowed(coin_id):
  identity=identifier(coin_id)

@@ -14,6 +14,14 @@ class MarketTests(unittest.TestCase):
   with patch('providers.request_json',return_value=[item]) as request:
    value=m.listings();self.assertEqual(value['coins'][0]['price_change_percentage_30d'],'-12.5');self.assertIn('30d',request.call_args.args[0])
   self.assertIsNone(m.coin_row(row())['price_change_percentage_30d'])
+ def test_two_pages_expand_to_500_and_cache(self):
+  pages=[[row('coin-'+str(i),i) for i in range(1,251)],[row('coin-'+str(i),i) for i in range(251,501)]]
+  with patch('providers.request_json',side_effect=pages) as req:
+   data=m.listings();self.assertEqual(len(data['coins']),500);self.assertFalse(data['partial']);self.assertIn('page=2',req.call_args.args[0]);m.listings();self.assertEqual(req.call_count,2)
+ def test_second_page_failure_preserves_first_page(self):
+  first=[row('coin-'+str(i),i) for i in range(1,251)]
+  with patch('providers.request_json',side_effect=[first,ValueError('limited')]):data=m.listings()
+  self.assertEqual(len(data['coins']),250);self.assertTrue(data['partial']);self.assertIn('unavailable',data['coverage'])
  def test_ids_reject_traversal_and_unknown(self):
   for value in ['../secret','https://evil','Bitcoin',True,'x'*101]:
    with self.assertRaises(ValueError):m.identifier(value)
