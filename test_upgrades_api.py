@@ -37,6 +37,24 @@ class UpgradeTests(base.APITests):
    with self.assertRaises(urllib.error.HTTPError):self.call(self.b,'exchange-sync',{'id':identity})
    refreshed=self.call(self.a,'exchange-sync',{'id':identity});self.assertEqual(len(refreshed['connections']),1)
    self.call(self.a,'exchange-delete',{'id':identity});self.assertEqual(self.call(self.a,'state')['exchanges'],[])
+ def test_exchange_trade_preview_owner_and_explicit_import(self):
+  import server,json
+  from test_exchange_trade_imports import fill
+  identity='d'*32
+  with server.connect() as c:
+   uid=c.execute('SELECT id FROM users WHERE email=?',('a@test.com',)).fetchone()['id']
+   c.execute('INSERT INTO exchange_connections VALUES (?,?,?,?,?)',(uid,identity,'Fixture','encrypted','{}'));c.commit()
+  raw={'id':identity,'pair':'BTCUSDT','usdt_usd_rate':'1'}
+  with patch('exchange_connections.crypt',return_value={'api_key':'private-key','api_secret':'private-secret'}),patch('exchange_connections.signed',return_value=[fill()]) as signed:
+   fetched=self.call(self.a,'exchange-trades-preview',raw)
+   self.assertEqual(fetched['count'],1);self.assertNotIn('private-secret',json.dumps(fetched));self.assertEqual(self.call(self.a,'state')['trades'],[])
+   with self.assertRaises(urllib.error.HTTPError):self.call(self.b,'exchange-trades-preview',raw)
+   self.assertEqual(signed.call_count,1)
+  reviewed=self.call(self.a,'import-preview',{'csv':fetched['csv']})
+  self.assertEqual(reviewed['count'],1)
+  self.call(self.a,'import',{'csv':fetched['csv']})
+  self.assertEqual(len(self.call(self.a,'state')['trades']),1)
+  self.assertEqual(self.call(self.b,'state')['trades'],[])
  def test_price_refresh_revalues_exchange_without_resync(self):
   import server,json
   snapshot={'balances':[{'asset':'LDBNB','display_quantity':'1.25','quantity':'1','coin_id':'binancecoin','valuation_basis':'verified_earn_underlying','value_usd':'100'}],'updated_at':123}

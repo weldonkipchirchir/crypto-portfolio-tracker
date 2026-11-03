@@ -6,7 +6,7 @@ import providers
 import exchange_charts
 import coin_market
 PERMISSIONS=('enableWithdrawals','enableInternalTransfer','enableMargin','enableFutures','permitsUniversalTransfer','enableVanillaOptions','enableFixApiTrade','enableSpotAndMarginTrading','enablePortfolioMarginTrading')
-PATHS=('/sapi/v1/account/apiRestrictions','/api/v3/account','/sapi/v1/simple-earn/flexible/position','/sapi/v1/simple-earn/locked/position')
+PATHS=('/sapi/v1/account/apiRestrictions','/api/v3/account','/sapi/v1/simple-earn/flexible/position','/sapi/v1/simple-earn/locked/position','/api/v3/myTrades')
 EARN_SYMBOLS=set('BNB BTC USDT ETH LINK XRP XLM USDC UNI ALGO FET SOL HBAR AAVE AVAX CELR NEAR RAY QNT INJ GMX FLUX SUI PENDLE SEI ENA TAO G RENDER POL BNSOL ONDO 0G'.split())
 
 def init(c):
@@ -72,13 +72,16 @@ def rewrap_credentials(c,uid):
 class NoRedirect(urllib.request.HTTPRedirectHandler):
  def redirect_request(self,*args,**kwargs):return None
 
-def signed(path,key,secret,*,page=1):
+def signed(path,key,secret,*,page=1,symbol=None):
  if path not in PATHS:raise ValueError('Unsupported exchange operation')
  params={'timestamp':int(time.time()*1000),'recvWindow':5000}
  if path==PATHS[1]:params['omitZeroBalances']='true'
- if path in PATHS[2:]:
+ if path in PATHS[2:4]:
   if type(page) is not int or not 1<=page<=3:raise ValueError('Invalid Earn position page')
   params.update(current=page,size=100)
+ if path==PATHS[4]:
+  if not isinstance(symbol,str) or not re.fullmatch(r"[A-Z0-9]{1,26}USDT",symbol):raise ValueError("Choose a USDT trading pair")
+  params.update(symbol=symbol,limit=1000)
  query=urlencode(params)
  signature=hmac.new(secret.encode(),query.encode(),hashlib.sha256).hexdigest()
  req=urllib.request.Request('https://api.binance.com'+path+'?'+query+'&signature='+signature,headers={'X-MBX-APIKEY':key,'User-Agent':'OrbitPortfolio/1.0'})
@@ -89,7 +92,9 @@ def signed(path,key,secret,*,page=1):
    body=response.read(2*1024*1024+1)
    if len(body)>2*1024*1024:raise ValueError()
    result=json.loads(body)
-  if not isinstance(result,dict) or 'code' in result:raise ValueError()
+  if path==PATHS[4]:
+   if not isinstance(result,list) or len(result)>1000:raise ValueError()
+  elif not isinstance(result,dict) or 'code' in result:raise ValueError()
   return result
  except Exception:raise ValueError('Binance could not verify this read-only key. Check its permissions, IP restrictions, region and server clock.') from None
 

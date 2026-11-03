@@ -347,6 +347,12 @@ class Handler(BaseHTTPRequestHandler):
       elif self.path=='/api/coin-alert-check':result=coin_alerts.evaluate(c,uid,prepared)
       else:result=coin_alerts.remove(c,uid,raw)
       c.commit();result['delivery']=alert_email.deliver(c,uid);self.send(200,result);return
+     if self.path=='/api/exchange-trades-preview':
+      import exchange_trade_imports
+      c.commit()
+      with (__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)):
+       result=exchange_trade_imports.preview(c,uid,raw)
+      self.send(200,result);return
      if self.path in ('/api/profile','/api/learning-notes','/api/exchange-state','/api/chart-setup-load'):
       result={'/api/profile':lambda:account_features.state(c,uid),'/api/learning-notes':lambda:account_features.notes(c,uid),'/api/exchange-state':lambda:exchange_connections.state(c,uid),'/api/chart-setup-load':lambda:workspace_features.load(c,uid,raw)}[self.path]()
       self.send(200,result);return
