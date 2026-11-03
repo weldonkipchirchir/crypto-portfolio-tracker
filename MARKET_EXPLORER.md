@@ -25,3 +25,5 @@ Market coverage supports up to 500 provider-ranked coins across two bounded page
 Screener period, coverage, direction, sort and layout are remembered on this browser using validated local preferences. Search text is not persisted. Search updates locally while typing and retains focus. Empty results explain how to broaden filters. Blocked browser storage does not prevent use.
 
 The market screener can focus on the account watchlist by exact coin ID, intersected with chosen rank coverage and valid period returns. Bitcoin remains sourced from all loaded listings. Watchlist fetch errors are visible rather than presented as a confirmed empty list. Watchlist scope is session-only; tiles include full coin names and ranks to distinguish shared symbols.
+
+Export CSV downloads exactly the filtered and sorted market sample, with USD price, cap and reported 24h volume; selected-period returns, BTC return and gap in percentage points; retrieval time, source and stale/partial flags. Missing values are blank. Text fields are quoted and protected against spreadsheet formula interpretation. Export runs locally without additional provider requests or uploading the list.
