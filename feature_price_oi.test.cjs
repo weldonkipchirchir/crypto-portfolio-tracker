@@ -4,3 +4,8 @@ const f=box.window.OrbitFeatureModules.price_oi;
 const d={assets:{bitcoin:'<img src=x>'},coin_id:'bitcoin',base:'<script>',symbol:'<img>',venue:'Binance',period:'1h',fetched_at:1000,start:0,end:2000,errors:{oi:'<script>alert(1)</script>'},rows:[{timestamp:1000,price:10,oi_coin:null,oi_quote:null,volume:2,funding_rate:0.001}]};
 const html=f.render(d);assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));assert.match(html,/Missing observation/);assert.match(html,/Exact timestamp matches only/);assert.match(html,/not contract count/);assert.match(html,/&lt;script&gt;/);
 (async()=>{let call;await f.load(async(...a)=>{call=a},{});assert.equal(call[0],'feature-read');assert.equal(call[1].feature,'price_oi');assert.equal(call[1].period,'1h');console.log('Price/OI UI contract and escaping passed.');})().catch(e=>{console.error(e);process.exitCode=1});
+
+const flat=f.render({...d,base:'BTC',rows:[{timestamp:1000,price:10,oi_coin:0}]});
+assert.match(flat,/cy="100"/,'constant price and OI samples should be centered, rather than pinned to the lower edge');
+assert.ok(!/NaN|Infinity/.test(flat));
+assert.match(flat,/M60 100H840/,'observations retain a visible horizontal reference grid');
