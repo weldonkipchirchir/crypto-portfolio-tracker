@@ -4,6 +4,7 @@ from decimal import Decimal
 from urllib.parse import urlencode
 import coin_market as m
 import exchange_charts
+from rsi_assets import ASSETS as RSI_EXTRA_ASSETS
 import providers
 
 NARRATIVES={
@@ -163,18 +164,19 @@ def interval_rsi(payload,interval,now=None):
  return wilder([points[t] for t in ordered]),ordered[-1]//1000
 
 def rsi(interval='1d',limit=8):
- if interval not in ('1h','4h','1d') or type(limit) is not int or limit not in (5,8,10,15,20):raise ValueError('Choose 1H, 4H or 1D and 5, 8, 10, 15 or 20 assets')
- assets=(list(RSI_ASSETS)+[coin for coin in exchange_charts.ASSETS if coin not in RSI_ASSETS])[:limit]
+ if interval not in ('1h','4h','1d') or type(limit) is not int or limit not in (5,8,10,15,20,50,100):raise ValueError('Choose 1H, 4H or 1D and 5, 8, 10, 15, 20, 50 or 100 assets')
+ mapping={**exchange_charts.ASSETS,**RSI_EXTRA_ASSETS}
+ assets=(list(RSI_ASSETS)+[coin for coin in mapping if coin not in RSI_ASSETS])[:limit]
  def load():
   from concurrent.futures import ThreadPoolExecutor
   from contextlib import nullcontext
   callbacks=getattr(m.STORE,'callbacks',None);cutoff=getattr(providers._REQUEST_CONTEXT,'cutoff',None) or time.monotonic()+25
   def observe(identity):
    with providers.deadline(cutoff), (m.persistence(*callbacks) if callbacks else nullcontext()):
-    row={'coin_id':identity,'symbol':exchange_charts.ASSETS[identity],'available':False,'value':None,'signal':None,'source':None,'pair':None,'observed_at':None}
+    row={'coin_id':identity,'symbol':mapping[identity],'available':False,'value':None,'signal':None,'source':None,'pair':None,'observed_at':None}
     for source in ('binance','coinbase'):
      try:
-      payload=exchange_charts.chart(identity,90,'candles',source) if interval=='1d' else exchange_charts.chart(identity,7 if interval=='1h' else 30,'candles',source,interval)
+      payload=exchange_charts.chart(identity,90,'candles',source,asset_map=mapping) if interval=='1d' else exchange_charts.chart(identity,7 if interval=='1h' else 30,'candles',source,interval,asset_map=mapping)
       value,stamp=interval_rsi(payload,interval)
       row.update(available=True,value=round(value,2),signal='overbought' if value>=70 else 'oversold' if value<=30 else 'neutral',source=payload.get('source'),pair=payload.get('pair'),observed_at=stamp);break
      except ValueError:pass
@@ -182,8 +184,8 @@ def rsi(interval='1d',limit=8):
     return row
   with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(observe,assets))
   if not any(r['available'] for r in rows):raise ValueError('RSI providers unavailable')
-  return {'rows':rows,'period':14,'interval':{'1h':'hourly','4h':'4-hour','1d':'daily'}[interval],'interval_code':interval,'source':'Exchange spot candles','coverage':'Wilder RSI(14), completed UTC candles for '+str(len(assets))+' curated spot assets. Binance USDT with Coinbase USD fallback. At least 15 consecutive closes; no interpolated gaps. Not a trade recommendation.'}
- return m.cached(('fundamentals','intelligence-rsi-v2',interval,limit),300 if interval!='1d' else 900,load)
+  return {'rows':rows,'requested_assets':limit,'available_assets':sum(r['available'] for r in rows),'partial':not all(r['available'] for r in rows),'period':14,'interval':{'1h':'hourly','4h':'4-hour','1d':'daily'}[interval],'interval_code':interval,'source':'Exchange spot candles','coverage':'Wilder RSI(14), completed UTC candles for '+str(len(assets))+' curated spot assets. Larger selections may be partial under the shared request deadline; 50/100-coin selections cache for 60 seconds, so refresh after a minute to retry missing candles. Binance USDT with Coinbase USD fallback. At least 15 consecutive closes; no interpolated gaps. Not a trade recommendation.'}
+ return m.cached(('fundamentals','intelligence-rsi-v2',interval,limit),60 if limit>=50 else (300 if interval!='1d' else 900),load)
 
 def alt_season():
  def load():

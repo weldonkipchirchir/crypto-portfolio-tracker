@@ -88,7 +88,7 @@ class IntelligenceTests(unittest.TestCase):
   with self.assertRaises(ValueError):mi.daily_rsi(payload,now)
  def test_rsi_fallback_and_explicit_coverage(self):
   payload,_=self.candles();payload.update(source='Coinbase Exchange',pair='BTC-USD')
-  def chart(identity,days,kind,source):
+  def chart(identity,days,kind,source,**kwargs):
    if source=='binance':raise ValueError('regional restriction')
    return payload
   with patch.object(mi.exchange_charts,'chart',side_effect=chart):r=mi.rsi()

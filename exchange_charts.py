@@ -43,13 +43,14 @@ def candle(row,source,minimum,maximum):
  if volume is not None:result['volume']=volume
  return result
 
-def chart(coin_id,days,kind='line',source='binance',interval=None):
+def chart(coin_id,days,kind='line',source='binance',interval=None,asset_map=None):
  if not isinstance(source,str) or source not in ROOTS:raise ValueError('Unsupported exchange chart provider')
  if isinstance(days,bool) or str(days) not in ('1','7','30','90','365','max'):raise ValueError('Unsupported chart range')
  if kind not in ('line','candles'):raise ValueError('Unsupported chart type')
  if interval is not None and (not isinstance(interval,str) or interval not in INTERVALS):raise ValueError('Unsupported candle interval')
  identity=market.identifier(coin_id)
- if identity not in ASSETS:raise ValueError('This coin has no verified exchange product mapping; select CoinGecko')
+ mapping=ASSETS if asset_map is None else asset_map
+ if identity not in mapping:raise ValueError('This coin has no verified exchange product mapping; select CoinGecko')
  market.allowed(identity)
  requested='max' if days=='max' else int(days)
  if interval is not None:
@@ -57,7 +58,7 @@ def chart(coin_id,days,kind='line',source='binance',interval=None):
   start=(1502928000 if source=='binance' else COINBASE_START) if requested=='max' else bucket_start(now-requested*86400,seconds)
   base_seconds=3600 if source=='coinbase' and interval=='4h' else 86400 if source=='coinbase' and interval=='1w' else seconds
   if (now-start)//base_seconds+1>(6000 if source=='binance' else MAX_CHUNKS*299):raise ValueError('This interval needs too many candles; choose a shorter range or larger interval')
- base=ASSETS[identity];quote='USDT' if source=='binance' else 'USD';pair=base+quote if source=='binance' else base+'-'+quote
+ base=mapping[identity];quote='USDT' if source=='binance' else 'USD';pair=base+quote if source=='binance' else base+'-'+quote
  def load():
   meta=metadata(source,pair,base,quote)
   if meta.get('stale'):raise ValueError('Fresh exchange identity verification unavailable')

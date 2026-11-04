@@ -11,11 +11,11 @@ class IntervalTests(unittest.TestCase):
    with self.assertRaises(ValueError):m.interval_rsi({**payload,'stale':True},interval,now)
    with self.assertRaises(ValueError):m.interval_rsi({**payload,'candles':bars[-10:]},interval,now)
  def test_invalid_choices(self):
-  for interval,limit in [('5m',20),('1h',100),('1d',True)]:
+  for interval,limit in [('5m',20),('1h',101),('1d',True)]:
    with self.assertRaises(ValueError):m.rsi(interval,limit)
  def test_supported_count_choices(self):
   from unittest.mock import patch
-  for count in (5,8,10,15,20):
+  for count in (5,8,10,15,20,50,100):
    with patch.object(m.m,'cached',side_effect=lambda key,ttl,load:load()), patch.object(m.exchange_charts,'chart',return_value={'source':'fixture','pair':'BTCUSDT'}), patch.object(m,'interval_rsi',return_value=(50,1800000000)):
     result=m.rsi('1d',count)
     self.assertEqual(len(result['rows']),count)
