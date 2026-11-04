@@ -5,3 +5,5 @@
 .feature-selected [data-feature-body]{overflow-x:auto}.feature-selected [data-feature-body]>.panel{margin:0;padding:0;border:0;background:transparent}.feature-mobile-picker{display:none}@media(max-width:650px){.feature-mobile-picker{display:grid;gap:6px}.feature-tool-grid{display:none}}
 
 .feature-selected [role="alert"],.feature-selected [role="status"]{overflow-wrap:anywhere}.feature-selected input[type="checkbox"]{width:18px;height:18px;align-self:start}.feature-selected select{width:100%}
+
+.feature-scope{padding:12px 14px;border:1px solid var(--border,var(--line));border-left:3px solid #568fe0;border-radius:10px;font-size:13px;line-height:1.5}.feature-selected button:focus-visible,.feature-categories button:focus-visible,.feature-tool-grid button:focus-visible{outline:3px solid #568fe0;outline-offset:3px}
