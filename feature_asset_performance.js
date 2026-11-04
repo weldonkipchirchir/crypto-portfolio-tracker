@@ -1,0 +1,34 @@
+(function(g){
+'use strict';
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const number=v=>{if(v==null||typeof v==='boolean'||typeof v==='object'||String(v).trim()==='')return null;const n=Number(v);return Number.isFinite(n)?n:null};
+const positive=v=>{const n=number(v);return n!==null&&n>=0?n:null};
+const cash=v=>number(v)===null?'Unavailable':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:8}).format(Number(v));
+const pct=v=>number(v)===null?'Unavailable':Number(v).toFixed(2)+'%';
+function total(rows,field){let n=0;for(const t of rows){const v=positive(t[field]);if(v===null)return null;n+=v;if(!Number.isFinite(n))return null}return n}
+function analyze(state,params={}){
+ const available=typeof g.OrbitPerformance?.positions==='function',positions=available?g.OrbitPerformance.positions(state):[];
+ const requested=params.position_key??params.key,position=requested==null?positions[0]||null:positions.find(p=>p.key===requested)||null;
+ if(!position)return {available,positions,position:null,requested};
+ const p=position,ledger=p.source==='ledger',trades=ledger?(state.trades||[]).filter(t=>t.symbol===p.symbol).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||''))||String(a.id).localeCompare(String(b.id))):[];
+ const cost=ledger?positive(p.cost):null,quantity=positive(p.quantity),value=positive(p.value),unrealized=ledger?number(p.unrealized):null,realized=ledger?number(p.realized):null;
+ const average=cost!==null&&quantity>0?number(cost/quantity):null,unrealizedPercent=cost>0&&unrealized!==null?number(unrealized/cost*100):null;
+ const sells=trades.filter(t=>t.side==='sell');let soldCost=0;
+ for(const t of sells){const q=positive(t.quantity),price=positive(t.price),fee=positive(t.fee),gain=number(t.realized_pnl);if(q===null||price===null||fee===null||gain===null){soldCost=null;break}const c=q*price-fee-gain;if(!Number.isFinite(c)||c<0){soldCost=null;break}soldCost+=c;if(!Number.isFinite(soldCost)){soldCost=null;break}}
+ return {available,positions,position:p,requested,trades,cost,quantity,value,average,unrealized,realized,unrealizedPercent,realizedPercent:soldCost>0&&realized!==null?number(realized/soldCost*100):null,fees:ledger&&trades.length?total(trades,'fee'):null,unknownFees:trades.filter(t=>positive(t.fee)===null).length};
+}
+function chart(d){const rows=[['Current saved value',d.value],['Remaining recorded cost',d.cost]],known=rows.filter(r=>r[1]!==null),max=Math.max(0,...known.map(r=>r[1]));return '<figure aria-label="Current value and remaining cost in US dollars"><figcaption>Current snapshot · USD</figcaption>'+rows.map(([label,v])=>'<div><span>'+label+': '+esc(cash(v))+'</span>'+(v===null?'':'<div aria-hidden="true" style="height:12px;background:#64748b;max-width:100%;width:'+(max?v/max*100:0).toFixed(3)+'%"></div>')+'</div>').join('')+'<p>No historical valuations are inferred from trades or today’s balance.</p></figure>'}
+function render(d){let html='<section><label>Asset and source <select data-asset-performance-select><option value="">Choose a position</option>'+d.positions.map(p=>'<option value="'+esc(p.key)+'" '+(p.key===d.position?.key?'selected':'')+'>'+esc(p.symbol)+' · '+esc(p.label)+' · '+esc(p.key)+'</option>').join('')+'</select></label>';
+ if(!d.position)return html+'<p role="status">'+(!d.available?'Portfolio positions are unavailable.':d.requested!=null?'The selected position is no longer available. Select another position.':'No portfolio positions are available.')+'</p></section>';
+ const p=d.position,ledger=p.source==='ledger',metrics=[['Current quantity',d.quantity===null?'Unavailable':String(d.quantity)+' '+p.symbol],['Current saved value',cash(d.value)],['Remaining cost',cash(d.cost)],['Average remaining cost / unit',cash(d.average)],['Realized P&L',cash(d.realized)],['Realized return on sold cost',pct(d.realizedPercent)],['Unrealized P&L',cash(d.unrealized)],['Unrealized return on remaining cost',pct(d.unrealizedPercent)],['Recorded trade fees',cash(d.fees)]];
+ html+='<h3>'+esc(p.symbol)+' · '+esc(p.label)+'</h3><p>Position: '+esc(p.key)+'</p>'+(p.stale||p.balanceStale||p.incomplete?'<p role="status">This source is stale or incomplete. Saved values may not reflect the current balance or price.</p>':'')+(!ledger?'<p>Connected holdings have no linked purchase cost or trade timeline. Matching tickers or coin identities do not verify account history.</p>':'<p>Recorded ledger position. Remaining cost includes recorded fees; realized return divides recorded realized P&amp;L by sold cost derived from sales proceeds, fees and realized P&amp;L. Zero or unavailable denominators have no percentage.</p>')+'<dl>'+metrics.map(([label,value])=>'<dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd>').join('')+'</dl>'+chart(d);
+ if(p.coin_id)html+='<button data-asset-performance-market>Open coin in Markets</button>';
+ html+='<h3>Transaction timeline</h3>';
+ if(!d.trades.length)html+='<p>'+ (ledger?'No trades for this exact ledger symbol are loaded.':'Trade records are not automatically linked to this connected position.')+'</p>';
+ else html+='<p>Exact ledger symbol only · '+d.unknownFees+' unavailable fee fields. Fees are already included in ledger accounting; do not subtract them again. This is recorded activity, not a historical valuation chart.</p><div class="table-wrap"><table><thead><tr><th>Date</th><th>Side</th><th>Quantity</th><th>Unit price · USD</th><th>Fee · USD</th><th>Realized P&amp;L · USD</th><th>Account</th></tr></thead><tbody>'+d.trades.map(t=>'<tr><td>'+esc(t.date)+'</td><td>'+esc(t.side)+'</td><td>'+esc(positive(t.quantity)===null?'Unavailable':t.quantity)+'</td><td>'+esc(cash(positive(t.price)))+'</td><td>'+esc(cash(positive(t.fee)))+'</td><td>'+esc(t.side==='sell'?cash(t.realized_pnl):'Not applicable')+'</td><td>'+esc(t.account||'Unspecified')+'</td></tr>').join('')+'</tbody></table></div>';
+ return html+'</section>';
+}
+function bind(host,ctx){const select=host.querySelector('[data-asset-performance-select]'),button=host.querySelector('[data-asset-performance-market]');const change=()=>{if(select.value)Promise.resolve(ctx.reload({position_key:select.value})).catch(e=>ctx.error?.(e))},open=()=>ctx.openCoin?.(ctx.data.position.coin_id);select?.addEventListener('change',change);button?.addEventListener('click',open);return ()=>{select?.removeEventListener('change',change);button?.removeEventListener('click',open)}}
+g.OrbitFeatureModules||={};g.OrbitFeatureModules.asset_performance={title:'Asset performance',category:'Portfolio',description:'Inspect each source position, recorded costs, returns and exact ledger activity.',load:async(api,state,params={})=>analyze(state,params),render,bind};
+g.OrbitAssetPerformance={analyze,render,number};
+})(typeof window!=='undefined'?window:globalThis);

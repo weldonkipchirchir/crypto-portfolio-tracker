@@ -1,0 +1,5 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+require('./feature_orderbook_history.js');const f=globalThis.OrbitOrderbookHistory;
+test('cells aggregate actual price times base quantity and preserve sample gaps',()=>{const samples=[{observed_at:100000,bids:[{price:'99',quantity:'2',notional:'9999'}],asks:[{price:'101',quantity:'3'}]},{observed_at:900000,bids:[{price:'99',quantity:'4'}],asks:[{price:'101',quantity:'1'}]}];const grid=f.cells(samples);assert.equal(grid.columns.length,2);assert.equal(grid.columns[0].values.reduce((a,v)=>a+v.bids,0),198);assert.equal(grid.columns[0].values.reduce((a,v)=>a+v.asks,0),303);assert.equal(grid.columns[1].timestamp-grid.columns[0].timestamp,800000);});
+test('empty history starts without invented levels',()=>{const d={samples:[]};assert.match(f.heatmap(d),/Capture a snapshot/);assert.doesNotMatch(f.heatmap(d),/<rect/);assert.deepEqual(f.cells([]).columns,[])});
+test('history load never implicitly captures',async()=>{let raw;await globalThis.OrbitFeatureModules.orderbook_history.load(async(p,r)=>{raw=r},{});assert.equal(raw.operation,'history');assert.equal(raw.venue,'coinbase')});

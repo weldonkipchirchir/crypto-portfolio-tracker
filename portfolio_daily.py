@@ -1,5 +1,5 @@
 """Daily connected-portfolio valuations; never infer trade returns or missing days."""
-import json,time,hashlib
+import json,time,hashlib,math
 from datetime import datetime,timezone,timedelta
 from decimal import Decimal
 import advanced_portfolio,providers
@@ -7,8 +7,20 @@ import advanced_portfolio,providers
 def init(c):
  c.execute('CREATE TABLE IF NOT EXISTS portfolio_daily_values (user_id INTEGER NOT NULL,day TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(user_id,day))')
 
+def freshness(stamps,now):
+ unknown=False;old=False
+ for stamp in stamps:
+  if isinstance(stamp,bool) or not isinstance(stamp,(str,int,float)):
+   unknown=True;continue
+  try:
+   value=float(stamp)
+   if not math.isfinite(value) or value<=0:unknown=True
+   elif not 0<=now-value<=900:old=True
+  except (ValueError,TypeError):unknown=True
+ return unknown,old
+
 def observation(wallets,quotes,exchanges,now=None):
- now=int(time.time() if now is None else now);total=Decimal(0);priced=unpriced=0;positions={};coverage={};seen=set()
+ now=int(time.time() if now is None else now);total=Decimal(0);priced=unpriced=stale_count=unknown_freshness=0;positions={};coverage={};seen=set()
  for a in advanced_portfolio.assets(wallets):
   w=a['wallet'];address=str(w.get('address',''));address=address.lower() if a['chain'] in providers.EVM_CHAINS else address
   key='wallet:'+a['chain']+':'+address+':'+a['asset_id']
@@ -20,6 +32,8 @@ def observation(wallets,quotes,exchanges,now=None):
   positions[key]=str(quantity) if quantity is not None else 'unknown'
   coverage[key]=quantity is not None and price is not None
   if quantity is None or price is None:unpriced+=1;continue
+  unknown,old=freshness([(w.get('snapshot') or {}).get('updated_at') if a['native'] else (w.get('token_snapshot') or {}).get('updated_at'),quote.get('updated_at') if a['native'] else quote.get('price_updated_at')],now)
+  unknown_freshness+=int(unknown);stale_count+=int(old or bool(quote.get('price_stale')) or bool((w.get('snapshot') or {}).get('error')))
   total+=quantity*price;priced+=1
  accounts=set()
  for connection in sorted(exchanges,key=lambda e:int((e.get('snapshot') or {}).get('updated_at') or 0),reverse=True):
@@ -35,9 +49,11 @@ def observation(wallets,quotes,exchanges,now=None):
    value=advanced_portfolio.number(a.get('value_usd'));positions[key]=str(quantity) if quantity is not None else 'unknown'
    coverage[key]=value is not None
    if value is None:unpriced+=1;continue
+   unknown,old=freshness([snap.get('updated_at'),a.get('price_updated_at')],now)
+   unknown_freshness+=int(unknown);stale_count+=int(old or bool(a.get('price_stale')))
    total+=value;priced+=1
  if not priced:return None
- return {'date':datetime.fromtimestamp(now,timezone.utc).date().isoformat(),'value':str(total),'observed_at':now,'priced':priced,'unpriced':unpriced,'coverage_fingerprint':hashlib.sha256(json.dumps(coverage,sort_keys=True).encode()).hexdigest(),'balance_fingerprint':hashlib.sha256(json.dumps(positions,sort_keys=True).encode()).hexdigest()}
+ return {'date':datetime.fromtimestamp(now,timezone.utc).date().isoformat(),'value':str(total),'observed_at':now,'priced':priced,'unpriced':unpriced,'stale_count':stale_count,'freshness_verified':unknown_freshness==0,'unknown_freshness':unknown_freshness,'coverage_fingerprint':hashlib.sha256(json.dumps(coverage,sort_keys=True).encode()).hexdigest(),'balance_fingerprint':hashlib.sha256(json.dumps(positions,sort_keys=True).encode()).hexdigest()}
 
 def record(c,uid,wallets,quotes,exchanges,now=None):
  value=observation(wallets,quotes,exchanges,now)

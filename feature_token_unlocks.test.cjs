@@ -1,0 +1,5 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const box={window:{},URL};vm.runInNewContext(fs.readFileSync('feature_token_unlocks.js','utf8'),box);const f=box.window.OrbitFeatureModules.token_unlocks;
+const html=f.render({events:[{id:'" onclick="bad',coin_id:'<img src=x>',amount:'1',unlock_date:'2028-01-01',recipient:'<script>x</script>',source_url:'javascript:alert(1)',provenance:'Manually entered; not independently verified by Orbit.',upcoming:true}],coverage:'Supply never implies an unlock schedule.',provider:{status:'Unconfigured'}});
+assert.ok(!html.includes('<script>'));assert.ok(!html.includes('<img'));assert.ok(!html.includes('href="javascript:'));assert.match(html,/&lt;img/);assert.match(html,/not independently verified/);assert.match(html,/Unavailable/);assert.match(html,/UTC calendar/);
+(async()=>{const calls=[];await f.load(async(...args)=>{calls.push(args);return{}},{});assert.equal(calls[0][0],'feature-read');assert.equal(calls[0][1].feature,'token_unlocks');console.log('Token unlock UI contract, provenance and escaping passed.');})().catch(e=>{console.error(e);process.exitCode=1});

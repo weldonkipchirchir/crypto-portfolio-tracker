@@ -9,6 +9,14 @@ class DailyTests(unittest.TestCase):
   balances=[{'asset':'BTC','quantity':quantity,'value_usd':str(value)}]
   if unknown:balances.append({'asset':'UNKNOWN','quantity':'1','value_usd':None})
   return portfolio_daily.record(self.c,uid,[],{},[{'id':'a','snapshot':{'balances':balances}}],stamp)
+ def test_freshness_metadata_is_explicit(self):
+  row={'asset':'BTC','quantity':'1','value_usd':'100','price_updated_at':1000}
+  result=portfolio_daily.observation([],{},[{'id':'a','snapshot':{'updated_at':1000,'balances':[row]}}],1001)
+  self.assertTrue(result['freshness_verified']);self.assertEqual(result['stale_count'],0)
+  old=portfolio_daily.observation([],{},[{'id':'a','snapshot':{'updated_at':1000,'balances':[row]}}],2001)
+  self.assertTrue(old['freshness_verified']);self.assertEqual(old['stale_count'],1)
+  row.pop('price_updated_at');unknown=portfolio_daily.observation([],{},[{'id':'a','snapshot':{'updated_at':1000,'balances':[row]}}],1001)
+  self.assertFalse(unknown['freshness_verified'])
  def test_daily_changes_gaps_flows_and_isolation(self):
   self.save('2026-12-31',100);self.save('2027-01-01',110);self.save('2027-01-01T23:00:00',120)
   days=portfolio_daily.calendar(self.c,1)['days'];self.assertEqual(len(days),2);self.assertEqual(days[-1]['change'],'20');self.assertEqual(days[-1]['percentage'],'20.0')

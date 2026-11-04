@@ -29,3 +29,9 @@ STATIC_FILES['/market_discovery.js']=('market_discovery.js','text/javascript; ch
 STATIC_FILES['/footprint_ui.js']=('footprint_ui.js','text/javascript; charset=utf-8')
 
 STATIC_FILES['/landing.css']=('landing.css','text/css; charset=utf-8')
+
+from roadmap_features import IDS as FEATURE_IDS
+for filename in ['feature_workspace.js','feature_workspace.css']+['feature_'+identity+'.js' for identity in FEATURE_IDS]:
+ STATIC_FILES['/'+filename]=(filename,('text/javascript' if filename.endswith('.js') else 'text/css')+'; charset=utf-8')
+
+STATIC_FILES['/analytics-architecture.svg']=('analytics-architecture.svg','image/svg+xml')

@@ -1,0 +1,20 @@
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const sandbox = {window: {}};
+vm.runInNewContext(fs.readFileSync('feature_transfer_reconciliation.js', 'utf8'), sandbox);
+const feature = sandbox.window.OrbitFeatureModules.transfer_reconciliation;
+assert.match(feature.render({items: [], coverage: 'Saved only', total: 0}), /does not prove/);
+const html = feature.render({items: [{id: '\" onclick=\"bad', quantity: '1', asset: '<img src=x onerror=bad>', from_wallet: '<script>bad</script>', to_wallet: 'B', status: 'pending'}]});
+assert.ok(!html.includes('<img'));
+assert.ok(!html.includes('<script>'));
+assert.ok(html.includes('&lt;img'));
+assert.ok(html.includes('data-transfer-id="&quot; onclick=&quot;bad"'));
+(async () => {
+  const calls = [];
+  const api = async (...args) => { calls.push(args); return {items: []}; };
+  await feature.load(api, {});
+  assert.equal(calls[0][0], 'feature-read');
+  assert.equal(calls[0][1].feature, 'transfer_reconciliation');
+  console.log('Transfer review UI escaping, empty coverage and load contract passed.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

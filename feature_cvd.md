@@ -1,0 +1,9 @@
+# Cumulative volume delta
+
+`feature_cvd.js` registers `cvd` in the Derivatives category. It uses one authenticated `intelligence-flow` request for BTC, ETH or SOL spot on Coinbase (default, USD) or Binance (USDT). It consumes only `large_trades.sample_trades`, never the threshold-filtered `trades` collection or order book. No backend storage, pagination, background polling or history backfill is added.
+
+CVD is the cumulative sum of taker buy price × base quantity minus taker sell price × base quantity over accepted unique execution IDs. Existing service normalization reverses Coinbase's maker side and maps Binance `isBuyerMaker=true` to taker sell. USD and USDT are explicitly separate; Binance is never labeled USD. Chart and full accessible table use native quote notional; quantities remain in base coin. JavaScript floating-point calculation is display analytics, not accounting precision.
+
+Each load resets to zero for its own latest bounded sample (at most 100 prints), including refresh and identity changes. It is not a continuous session history or guaranteed complete time window. IDs deduplicate records; timestamp ties sort by ID. Conflicting duplicate IDs withhold the sample. Invalid IDs, prices, quantities, timestamps and unknown directions are dropped and counted. ID discontinuities and elapsed spacings over 60 seconds break chart lines; spacing is not proof of missing executions. Totals sum accepted prints across breaks, without synthetic fills. Receipt/as-of time remains unavailable unless returned by the service; last execution time is separately labeled. Provider stale metadata is shown without inventing freshness.
+
+Validation: `node --test feature_cvd.test.cjs`; upstream maker/taker semantics are covered by `test_coinbase_flow.py` and `test_market_microstructure.py`.

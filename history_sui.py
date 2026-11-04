@@ -80,7 +80,7 @@ def fetch_history(address,cursors=None):
      'direction':'out' if amount<0 else 'in' if amount>0 else 'self','asset':'SUI' if native else token,'asset_id':'Sui:native' if native else 'Sui:'+token,
      'quantity':units(abs(amount)) if native else None,'raw_quantity':str(abs(raw)),'decimals':9 if native else None,
      'fee':units(gas) if native and gas_payer==address and gas is not None and gas>=0 else None,'gas_net_cost':units(gas) if native and gas_payer==address and gas is not None else None,
-     'gas_inclusive':gas_inclusive,'review_eligible':eligible,'status':status,'identity_verified':native,'balance_change':True,
+     'fee_payer':gas_payer if native else None,'gas_inclusive':gas_inclusive,'review_eligible':eligible,'status':status,'identity_verified':native,'balance_change':True,
      'note':'Net balance change; token decimals unavailable, raw units only.' if not native else 'Net balance change includes gas; excluded from review.' if gas_inclusive else 'Native balance change adjusted for actual payer gas cost; no swap interpretation.'})
   return {'items':items,'cursors':{'transactions':following},'coverage':coverage(),'updated_at':int(time.time())}
  except (KeyError,TypeError,AttributeError,OverflowError):raise ValueError('Sui history provider returned malformed transaction data') from None

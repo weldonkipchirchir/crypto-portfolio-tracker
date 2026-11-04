@@ -1,0 +1,5 @@
+const test=require('node:test'),assert=require('node:assert/strict');
+require('./feature_funding_history.js');
+const d={coin_id:'bitcoin',assets:{bitcoin:'BTC'},start:1000,end:3000,fetched_at:3000,venues:[{name:'Binance',symbol:'BTCUSDT',source_url:'https://example.com',points:[{timestamp:1000,rate:0,observed_spacing_hours:null},{timestamp:3000,rate:0,observed_spacing_hours:2}]},{name:'Bybit',symbol:'BTCUSDT',source_url:'https://example.com',points:[],error:'Unavailable'}]};
+test('bounded finite scatter with no interpolated lines and accessible table',()=>{const html=global.OrbitFundingHistory.render(d);assert(!/NaN|Infinity/.test(html));assert(!html.includes('polyline'));assert(html.includes('<caption>Binance'));assert(html.includes('Unknown'));assert(html.includes('hypothetical'));assert(html.includes('percent per settlement'));});
+test('load requests feature read and identity default',async()=>{let args;await global.OrbitFeatureModules.funding_history.load(async(...a)=>{args=a;return d},{});assert.deepEqual(args,['feature-read',{feature:'funding_history',coin_id:'bitcoin'}]);});

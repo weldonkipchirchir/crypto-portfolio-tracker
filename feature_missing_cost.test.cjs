@@ -1,0 +1,27 @@
+const assert=require('node:assert/strict');
+require('./feature_missing_cost.js');
+const m=globalThis.OrbitMissingCost;
+(async()=>{
+ assert.equal(m.text(m.sum(['0.00000000000000000001','1e-20'])),'0.00000000000000000002');
+ assert.equal(m.text(m.sum(['9007199254740993','1'])),'9007199254740994');
+ assert.equal(m.sum(['1',null]),null);
+ assert.equal(m.decimal(''),null);
+ assert.equal(m.decimal(false),null);
+ const d=m.review({trades:[{side:'buy',price:null,fee:'0'},{side:'buy',price:'0',fee:'0'},{side:'sell',price:'0',fee:'0'}],reviews:[]});
+ assert.equal(d.missing,1);assert.equal(d.zero,1);assert.equal(d.purchases.length,2);
+ const original={id:1,date:'2026-01-01T01:00:00',symbol:'BTC',side:'buy',quantity:'0.001',price:'0',fee:'0',account:'Exchange'};
+ const calls=[],api=async(route,payload)=>{calls.push([route,payload]);return route==='state'?{trades:[original]}:{ok:true}};
+ await m.correction(api,original,'123.45','0',true);
+ assert.deepEqual(calls[1],['trade-update',{...original,price:'123.45'}]);
+ await assert.rejects(()=>m.correction(api,original,'','0',true));
+ await assert.rejects(()=>m.correction(api,original,'1','0',false));
+ let writes=0;
+ await assert.rejects(()=>m.correction(async route=>{if(route!=='state')writes++;return {trades:[]}},original,'1','0',true));
+ await assert.rejects(()=>m.correction(async()=>({trades:[{...original,quantity:'2'}]}),original,'1','0',true));
+ assert.equal(writes,0);
+ globalThis.OrbitPerformance={positions:()=>[{key:'a',source:'wallet',coin_id:'btc',symbol:'BTC',quantity:'0.00000000000000000001'},{source:'ledger',coin_id:'btc',quantity:'0'}]};
+ assert.match(m.review({}).groups[0].reason,/differ/);
+ const html=globalThis.OrbitFeatureModules.missing_cost.render(m.review({trades:[{...original,symbol:'<img>'}]}));
+ assert(!html.includes('<img>'));assert(html.includes('&lt;img&gt;'));
+ console.log('Missing-cost review: precision, missing/zero, correction preservation, stale/account absence and escaping checks passed.');
+})().catch(e=>{console.error(e);process.exitCode=1});

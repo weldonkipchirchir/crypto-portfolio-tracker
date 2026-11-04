@@ -54,7 +54,7 @@ def _parse(address,signature,tx):
             'asset':asset,'asset_id':asset_id,'quantity':_quantity(delta,decimals) if not failed else '0',
             'fee':_quantity(fee,9) if native else None,'status':status,
             'from_address':None,'to_address':None,'identity_verified':native,
-            'balance_owner':address}
+            'balance_owner':address,'fee_payer':keys[0] if native and keys else None}
     items=[]
     if address in keys:
         index=keys.index(address)

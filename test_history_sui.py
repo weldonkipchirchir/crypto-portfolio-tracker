@@ -20,10 +20,10 @@ class SuiHistoryTests(unittest.TestCase):
   self.assertEqual(e['quantity'],'1');self.assertEqual(e['fee'],'0.000001');self.assertTrue(e['review_eligible']);self.assertFalse(e['gas_inclusive'])
  def test_gas_only_does_not_become_sale(self):
   e=self.fetch([transaction([change(-1000)])])['items'][0]
-  self.assertEqual(e['quantity'],'0');self.assertEqual(e['direction'],'self');self.assertEqual(e['kind'],'contract_activity')
+  self.assertEqual(e['quantity'],'0');self.assertEqual(e['direction'],'self');self.assertEqual(e['kind'],'contract_activity');self.assertEqual(e['fee_payer'],OWNER)
  def test_sponsored_gas_not_added_to_owner(self):
   e=self.fetch([transaction([change(-1000000000)],payer=OTHER)])['items'][0]
-  self.assertEqual(e['quantity'],'1');self.assertIsNone(e['fee'])
+  self.assertEqual(e['quantity'],'1');self.assertIsNone(e['fee']);self.assertEqual(e['fee_payer'],OTHER)
  def test_unknown_gas_is_not_reviewable(self):
   tx=transaction([change(-1000)],payer=None)
   e=self.fetch([tx])['items'][0];self.assertTrue(e['gas_inclusive']);self.assertFalse(e['review_eligible'])

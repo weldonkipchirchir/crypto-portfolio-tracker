@@ -10,12 +10,13 @@ class SolanaHistoryTests(unittest.TestCase):
  def test_native_fee_removed_and_token_exact(self):
   with patch('history_solana._rpc',side_effect=[[{'signature':S}],tx()]):r=h.fetch_history(A)
   native,token=r['items'];self.assertEqual(native['quantity'],'1');self.assertEqual(native['fee'],'0.000005')
+  self.assertEqual(native['fee_payer'],A);self.assertIsNone(token['fee_payer'])
   self.assertEqual(native['direction'],'out');self.assertEqual(token['quantity'],'123.456789')
   self.assertEqual(token['direction'],'in');self.assertIsNone(token['from_address'])
  def test_failed_metadata_no_trade(self):
   transaction=tx();transaction['meta']['err']={'error':'failed'}
   with patch('history_solana._rpc',side_effect=[[{'signature':S}],transaction]):r=h.fetch_history(A)
-  self.assertEqual(len(r['items']),1);self.assertEqual(r['items'][0]['status'],'failed');self.assertEqual(r['items'][0]['quantity'],'0')
+  self.assertEqual(len(r['items']),1);self.assertEqual(r['items'][0]['status'],'failed');self.assertEqual(r['items'][0]['quantity'],'0');self.assertEqual(r['items'][0]['fee_payer'],A)
  def test_null_transaction_aborts_no_cursor(self):
   with patch('history_solana._rpc',side_effect=[[{'signature':S}],None]):
    with self.assertRaises(ValueError):h.fetch_history(A)

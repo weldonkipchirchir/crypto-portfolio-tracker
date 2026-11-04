@@ -20,6 +20,7 @@ import coin_alerts
 import account_features
 import exchange_connections
 import workspace_features
+import roadmap_features
 import wallet_batch
 import market_watch
 import exchange_charts
@@ -83,6 +84,7 @@ def init():
   account_features.init(c)
   exchange_connections.init(c)
   workspace_features.init(c)
+  roadmap_features.init(c)
   c.execute('CREATE TABLE IF NOT EXISTS coin_market_cache (key TEXT PRIMARY KEY,fetched_at INTEGER NOT NULL,data TEXT NOT NULL)')
 
 def market_cache_read(key):
@@ -230,7 +232,7 @@ class Handler(BaseHTTPRequestHandler):
   self.send_header('X-Frame-Options','DENY')
   self.send_header('Referrer-Policy','no-referrer')
   self.send_header('Cache-Control','no-store')
-  self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'")
+  self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'".replace("connect-src 'self';", "connect-src 'self' wss://ws.okx.com:8443;" if self.path.split("?",1)[0]=="/app.html" else "connect-src 'self';"))
   super().end_headers()
  def valid_host(self):
   try: host=urlsplit('//'+self.headers.get('Host','')).hostname
@@ -347,6 +349,16 @@ class Handler(BaseHTTPRequestHandler):
       elif self.path=='/api/coin-alert-check':result=coin_alerts.evaluate(c,uid,prepared)
       else:result=coin_alerts.remove(c,uid,raw)
       c.commit();result['delivery']=alert_email.deliver(c,uid);self.send(200,result);return
+     if self.path=='/api/feature-read':
+      c.commit()
+      with (__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)),coin_market.persistence(market_cache_read,market_cache_write):
+       result=roadmap_features.read(c,uid,raw)
+      self.send(200,result);return
+     if self.path=='/api/feature-action':
+      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+      else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      result=roadmap_features.action(c,uid,raw);c.commit();self.send(200,result);return
      if self.path=='/api/exchange-trades-preview':
       import exchange_trade_imports
       c.commit()
