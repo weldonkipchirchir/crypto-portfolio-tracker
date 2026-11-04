@@ -163,7 +163,7 @@ def interval_rsi(payload,interval,now=None):
  return wilder([points[t] for t in ordered]),ordered[-1]//1000
 
 def rsi(interval='1d',limit=8):
- if interval not in ('1h','4h','1d') or type(limit) is not int or limit not in (8,20):raise ValueError('Choose 1H, 4H or 1D and 8 or 20 assets')
+ if interval not in ('1h','4h','1d') or type(limit) is not int or limit not in (5,8,10,15,20):raise ValueError('Choose 1H, 4H or 1D and 5, 8, 10, 15 or 20 assets')
  assets=(list(RSI_ASSETS)+[coin for coin in exchange_charts.ASSETS if coin not in RSI_ASSETS])[:limit]
  def load():
   from concurrent.futures import ThreadPoolExecutor
