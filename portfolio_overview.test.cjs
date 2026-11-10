@@ -9,3 +9,22 @@ assert(p.beginnerGuide({}).includes("0 of 2 setup steps complete"));assert(p.beg
 assert.equal(p.observedTime('2024-01-01T00:00:00Z'),1704067200000);assert.equal(p.observedTime(1704067200),1704067200000);assert.equal(p.observedTime(1704067200000),1704067200000);assert.equal(p.observedTime(false),null);assert.equal(p.observedTime('invalid'),null);const healthNow=1704067200000;assert.equal(p.connectionHealth({exchanges:[{snapshot:{updated_at:1704067200,earn_status:'partial'}}]},healthNow)[0].status,'Needs attention');assert.equal(p.connectionHealth({wallets:[{chain:'Ethereum',snapshot:{updated_at:1704067200}}]},healthNow+900001)[0].status,'Sync recommended');assert.equal(p.connectionHealth({exchanges:[{snapshot:{updated_at:1704067300}}]},healthNow)[0].status,'Check timestamp');assert.equal(p.connectionHealth({wallets:[{}]},healthNow)[0].status,'Not synced');assert(!p.healthView({exchanges:[{label:'<script>',snapshot:{}}]}).includes('<script>'));
 
 (async()=>{let now=0,calls=0;const p1=p.poller({now:()=>now,active:()=>true,refresh:async()=>{calls++}});await p1.tick();now=59999;await p1.tick();assert.equal(calls,1);now=60000;await p1.tick();assert.equal(calls,2);assert(p.render({}).includes('Auto-update · 1 min'));console.log('One-minute quote refresh boundary passed.');})().catch(e=>{console.error(e);process.exitCode=1});
+
+// Freshness must validate both amount observations and quotes, including malformed/future stamps.
+const fixed=Date.parse('2026-11-10T12:00:00Z'),seconds=fixed/1000;
+const exchangeAt=(stamp,quote=seconds,value=100)=>({id:'x',snapshot:{account_key:'account',updated_at:stamp,balances:[{value_usd:value,price_updated_at:quote}]}});
+for(const stamp of ['invalid',seconds+1000,Infinity,true,null])assert.equal(p.totals({exchanges:[exchangeAt(stamp)]},fixed).stale,1);
+for(const stamp of ['invalid',seconds+1000,Infinity,true,null])assert.equal(p.totals({exchanges:[exchangeAt(seconds,stamp)]},fixed).stale,1);
+assert.equal(p.totals({exchanges:[exchangeAt(seconds)]},fixed).stale,0);
+assert.equal(p.totals({exchanges:[exchangeAt(seconds-901)]},fixed).stale,1);
+const latestIso={...exchangeAt('2026-11-10T12:00:00Z',seconds,200),id:'new'},olderSeconds={...exchangeAt(seconds-100,seconds,100),id:'old'};
+assert.equal(p.totals({exchanges:[olderSeconds,latestIso]},fixed).exchange,200);
+const badWalletContext={window:{OrbitAdvanced:{assets:()=>[{priced:1,value:NaN},{priced:1,value:null},{priced:1,value:0,isStale:false,holdings:[{token:{balance_observed_at:seconds,price_fetched_at:seconds}}]}]}},Intl,Date};vm.createContext(badWalletContext);vm.runInContext(fs.readFileSync('portfolio_overview.js','utf8'),badWalletContext);const bad=badWalletContext.window.OrbitPortfolio.totals({wallets:[{}]},fixed);assert.equal(bad.walletPriced,1);assert.equal(bad.wallet,0);assert.equal(bad.unpriced,2);
+const ledgerUnknown=p.totals({assets:[{symbol:'BTC',quantity:1,value:50}]},fixed);assert.equal(ledgerUnknown.stale,1);assert.equal(p.totals({assets:[{symbol:'BTC',quantity:1,value:50}],price_metadata:{BTC:{updated_at:seconds}}},fixed).stale,0);
+const overflow=p.totals({assets:[{quantity:1,value:1e308},{quantity:1,value:1e308}]},fixed);assert.equal(overflow.total,null);assert(overflow.partial);assert(!p.render({assets:[{quantity:1,value:1e308},{quantity:1,value:1e308}]}).includes('Infinity'));
+const statusHtml=p.render({exchanges:[exchangeAt(seconds-3600)]});assert(statusHtml.includes('portfolio-valuation-status'));assert(statusHtml.includes('Partial saved valuation'));assert(statusHtml.includes('sync balances separately'));
+console.log('Valuation QA: invalid/future timestamps, ISO account freshness ordering, finite priced counts, ledger quote provenance and overflow safety passed.');
+
+for(const invalidStamp of [1e20,[],{},'   '])assert.equal(p.observedTime(invalidStamp),null);
+
+for(const stamp of [seconds+1000,'invalid',1e20])assert.equal(p.totals({exchanges:[exchangeAt(stamp,seconds,999),exchangeAt(seconds,seconds,100)]},fixed).exchange,100);

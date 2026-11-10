@@ -30,3 +30,11 @@ These defects were reproduced by source-level QA, not discovered by executing th
 This is bounded QA of sign-in, navigation, responsive Analytics, funding and footprint zoom. Account mutations, real credential exchange import, email delivery, every indicator and every provider failure were not exercised. No claim of full application correctness or security certification is made. Native Hopper/Ghidra engines were unnecessary for these web artifacts.
 
 Final verification: all 53 frontend suites passed. The full Python run completed 572 tests with 21 optional tests skipped. Static build and whitespace checks passed. All eight captured deployment scripts were byte-identical to checkout source files before these backend fixes.
+
+## Overview, Markets and Data follow-up
+
+REA Evidence `ev_3169584c85670bfe2f1c9d2894684edc566cdd3d5678bc141b6a7b53110ec6e7` covers the public pre-fix `portfolio_overview.js` and `market_dashboard.js` captures plus their hash manifest. Two scripts parsed, 11,360 AST nodes visited, no parse failures. Retained evidence: `C:/Users/weldo/.codex/visualizations/2026/10/24/01a16f71-b4a0-7812-8cf8-c3590314d9b7/rea-valuation-charts-evidence.json`. The earlier Data artifact evidence is reused. Neither static result is evidence of runtime calculation correctness.
+
+Source regressions reproduce invalid/future timestamp freshness, corrupt duplicate snapshot precedence, invalid priced counts, overflow totals, numeric coercion in Data/Markets, invalid chart dates, unsorted observations, hidden off-scale quotes and old quote requests delaying newly selected coin quotes. Fixes preserve separate connected and ledger totals, expose saved-value coverage near the total, reject malformed observations, and make off-scale prices explicit. Provider data can be stale, missing or wrong; a saved valuation is an estimate, not an execution guarantee.
+
+Integrated follow-up regression: all 53 frontend suites, 13 affected persistence/auth/static-asset tests, static build and whitespace checks passed.

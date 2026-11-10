@@ -6,7 +6,7 @@ const mounted=new WeakMap();
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-const num=v=>v===null||v===undefined||v===''||typeof v==='boolean'?null:Number.isFinite(Number(v))?Number(v):null;
+const num=v=>(typeof v==='number'||typeof v==='string'&&v.trim()!=='')&&Number.isFinite(Number(v))?Number(v):null;
 
 const fmt=(v,suffix='')=>num(v)===null?'Unavailable':new Intl.NumberFormat('en-US',{maximumFractionDigits:2}).format(Number(v))+suffix;
 
