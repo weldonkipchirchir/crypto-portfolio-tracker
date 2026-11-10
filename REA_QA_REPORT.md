@@ -40,3 +40,5 @@ Source regressions reproduce invalid/future timestamp freshness, corrupt duplica
 Integrated follow-up regression: all 53 frontend suites, 13 affected persistence/auth/static-asset tests, static build and whitespace checks passed.
 
 Production follow-up browser checks: new valuation status rendered explicit partial/stale counts; live BTC candle chart and Binance USDT quote loaded; keyboard date inspection reached the first observation of the selected 30-day range; browser error log was empty. Visual QA observed a chart occupying only about 610px of a 949px workspace beside a stretched valuation card. The follow-up CSS moves metrics below a full-width chart; no pricing calculation changes.
+
+Browser follow-up identified stale stylesheet reuse across deployments: the URL without a query still exposed the pre-fix CSS rules in the active browser despite updated production content. Build now emits content-hashed URLs for allowlisted app JavaScript and CSS. Four hosted-asset tests, including exact hash URLs, passed. This fix is based on observed stylesheet content, not an inferred REA finding.

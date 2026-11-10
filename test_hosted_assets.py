@@ -37,4 +37,13 @@ class HostedAssetsTests(unittest.TestCase):
    build(directory)
    self.assertEqual({p.relative_to(directory).as_posix() for p in Path(directory).rglob('*') if p.is_file()},{filename for filename,kind in STATIC_FILES.values()})
    self.assertIn('Personal cloud edition',Path(directory,'app.html').read_text(encoding='utf-8'))
+ def test_app_assets_are_content_versioned(self):
+  import hashlib
+  with tempfile.TemporaryDirectory() as directory:
+   build(directory)
+   app=Path(directory,'app.html').read_text(encoding='utf-8')
+   for name in ('market_dashboard.css','market_dashboard.js','portfolio_overview.js'):
+    digest=hashlib.sha256(Path(name).read_bytes()).hexdigest()[:16]
+    self.assertIn('/'+name+'?v='+digest,app)
+   self.assertNotIn('src="/market_dashboard.js"',app)
 if __name__=='__main__':unittest.main()
