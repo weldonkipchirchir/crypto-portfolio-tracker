@@ -112,7 +112,7 @@ def wilder(closes,period=14):
  values=[]
  for x in closes:
   raw=m.numeric(x)
-  if raw is None:raise ValueError('Invalid closing price')
+  if raw is None or Decimal(raw)<=0:raise ValueError('Invalid closing price')
   values.append(Decimal(raw))
  changes=[b-a for a,b in zip(values,values[1:])]
  gain=sum(max(d,Decimal(0)) for d in changes[:period])/period
@@ -170,22 +170,28 @@ def rsi(interval='1d',limit=8):
  def load():
   from concurrent.futures import ThreadPoolExecutor
   from contextlib import nullcontext
-  callbacks=getattr(m.STORE,'callbacks',None);cutoff=getattr(providers._REQUEST_CONTEXT,'cutoff',None) or time.monotonic()+25
+  callbacks=getattr(m.STORE,'callbacks',None);local_cutoff=time.monotonic()+25
+  parent_cutoff=getattr(providers._REQUEST_CONTEXT,'cutoff',None)
+  cutoff=min(local_cutoff,parent_cutoff) if parent_cutoff is not None else local_cutoff
   def observe(identity):
    with providers.deadline(cutoff), (m.persistence(*callbacks) if callbacks else nullcontext()):
     row={'coin_id':identity,'symbol':mapping[identity],'available':False,'value':None,'signal':None,'source':None,'pair':None,'observed_at':None}
     for source in ('binance','coinbase'):
+     if time.monotonic()>=cutoff:
+      row['error']='Shared request deadline reached before verified candles were available.';break
      try:
       payload=exchange_charts.chart(identity,90,'candles',source,asset_map=mapping) if interval=='1d' else exchange_charts.chart(identity,7 if interval=='1h' else 30,'candles',source,interval,asset_map=mapping)
       value,stamp=interval_rsi(payload,interval)
       row.update(available=True,value=round(value,2),signal='overbought' if value>=70 else 'oversold' if value<=30 else 'neutral',source=payload.get('source'),pair=payload.get('pair'),observed_at=stamp);break
      except ValueError:pass
-    if not row['available']:row['error']='Verified consecutive closed candles unavailable.'
+    if not row['available']:row.setdefault('error','Verified consecutive closed candles unavailable.')
     return row
   with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(observe,assets))
   if not any(r['available'] for r in rows):raise ValueError('RSI providers unavailable')
   return {'rows':rows,'requested_assets':limit,'available_assets':sum(r['available'] for r in rows),'partial':not all(r['available'] for r in rows),'period':14,'interval':{'1h':'hourly','4h':'4-hour','1d':'daily'}[interval],'interval_code':interval,'source':'Exchange spot candles','coverage':'Wilder RSI(14), completed UTC candles for '+str(len(assets))+' curated spot assets. Larger selections may be partial under the shared request deadline; 50/100-coin selections cache for 60 seconds, so refresh after a minute to retry missing candles. Binance USDT with Coinbase USD fallback. At least 15 consecutive closes; no interpolated gaps. Not a trade recommendation.'}
- return m.cached(('fundamentals','intelligence-rsi-v2',interval,limit),60 if limit>=50 else (300 if interval!='1d' else 900),load)
+ # A fresh cache age alone does not guarantee the newest completed candle: invalidate at UTC bucket boundaries.
+ bucket=int(time.time())//{'1h':3600,'4h':14400,'1d':86400}[interval]
+ return m.cached(('fundamentals','intelligence-rsi-v3',interval,limit,bucket),60 if limit>=50 else (300 if interval!='1d' else 900),load)
 
 def alt_season():
  def load():
