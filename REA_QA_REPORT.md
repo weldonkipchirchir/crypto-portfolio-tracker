@@ -55,3 +55,13 @@ REA CLI inspected the latest public pre-fix `portfolio_performance.js`. Evidence
 No missing historical values, cost bases or investment returns are inferred. The new rules can show unavailable changes where old code showed plausible but stale estimates. A balance sync and price refresh are separate operations.
 
 Regression verification: all 53 frontend suites passed after the final wallet fix. Full Python regression ran 576 tests with 21 optional tests skipped. Static build and whitespace checks passed.
+
+## Holdings colour and calendar navigation review
+
+REA Evidence `ev_81d80676e4944923b338ae39cb7ab0e76da4582b5c07139956d374a16f57c65c` captures the public pre-fix portfolio renderer (one script, 9,768 AST nodes, no parse failures). Retained at `C:/Users/weldo/.codex/visualizations/2026/10/24/01a16f71-b4a0-7812-8cf8-c3590314d9b7/rea-overview-sections-evidence.json`. Static inspection is supplemented by source semantics review and regressions; REA did not establish runtime correctness.
+
+Market-return colour is now independent of holding-balance freshness: a fresh exact-ID market percentage can colour an old saved holding, while its saved value remains marked for sync. Personal P&L colour and dollar-change estimates retain strict freshness requirements. Ledger positions propagate quote freshness from saved price metadata. Stale market percentages remain unavailable.
+
+Calendar navigation adds saved-month/all-month/specific-month filtering, a full-year saved-date/comparison summary, and distinct baseline/zero/missing legend entries. The explicit source switch applies to holdings analysis, while the calendar still represents connected portfolio observations. Hidden-amount mode now covers holdings-card USD amounts and their total.
+
+Validation: 53 frontend suites and 15 affected persistence/build tests passed. Saved history and cost basis are not reconstructed or inferred.
