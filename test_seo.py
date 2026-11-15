@@ -8,6 +8,11 @@ class Page(HTMLParser):
  def __init__(self,source):super().__init__();self.tags=[];self.feed(source)
  def handle_starttag(self,tag,attrs):self.tags.append((tag,dict(attrs)))
 class SEOTests(unittest.TestCase):
+ def assertPublicScripts(self,source,name):
+  scripts=[attrs for tag,attrs in Page(source).tags if tag=='script']
+  self.assertEqual(scripts,[{'src':'/landing_theme.js'}] if name=='index.html' else [])
+  if name=='index.html':self.assertNotIn('<script src="/landing_theme.js">function',source)
+
  def test_sitemap_pages_have_unique_titles_descriptions_and_canonicals(self):
   sitemap=ET.fromstring((ROOT/'sitemap.xml').read_text());urls=[node.text for node in sitemap.findall('{*}url/{*}loc')]
   self.assertEqual(len(urls),5);titles=set();descriptions=set()
@@ -22,7 +27,7 @@ class SEOTests(unittest.TestCase):
    self.assertEqual(meta['robots'],'index,follow')
    self.assertEqual(sum(tag=='h1' for tag,attrs in page.tags),1)
    self.assertIn(('link',{'rel':'canonical','href':url}),page.tags)
-   self.assertNotIn('<script',source)
+   self.assertPublicScripts(source,filename)
    for tag,attrs in page.tags:
     if tag=='a' and attrs.get('href','').startswith('/'):
      self.assertIn(attrs['href'].split('#',1)[0],STATIC_FILES)
@@ -55,7 +60,7 @@ class SEOTests(unittest.TestCase):
  def test_public_pages_need_no_application_bundle(self):
   for name in ('index.html','guides/wallet-tracking.html','guides/crypto-profit-loss.html','about-orbit.html'):
    source=(ROOT/name).read_text(encoding='utf-8')
-   self.assertNotIn('<script',source)
+   self.assertPublicScripts(source,name)
    self.assertNotIn('app.js',source)
    self.assertIn('public_site.css',source)
   self.assertLess((ROOT/'public_site.css').stat().st_size,6000)
@@ -75,7 +80,7 @@ class SEOTests(unittest.TestCase):
     source=Path(directory,name).read_text(encoding='utf-8')
     self.assertIn('<style>',source)
     self.assertNotIn('rel="stylesheet"',source)
-    self.assertNotIn('<script',source)
+    self.assertPublicScripts(source,name)
    self.assertIn('rel="stylesheet"',Path(directory,'app.html').read_text(encoding='utf-8'))
  def test_csv_example_matches_documented_accounting(self):
   import imports,server
