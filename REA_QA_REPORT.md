@@ -65,3 +65,20 @@ Market-return colour is now independent of holding-balance freshness: a fresh ex
 Calendar navigation adds saved-month/all-month/specific-month filtering, a full-year saved-date/comparison summary, and distinct baseline/zero/missing legend entries. The explicit source switch applies to holdings analysis, while the calendar still represents connected portfolio observations. Hidden-amount mode now covers holdings-card USD amounts and their total.
 
 Validation: 53 frontend suites and 15 affected persistence/build tests passed. Saved history and cost basis are not reconstructed or inferred.
+
+
+## Portfolio tracking and returns review — 2026-11-15
+
+REA evidence `ev_e2d05453e358ce52fd07d5b0ac03210d291513bfbcfe21a389c10451f58f686e` analyzed captured production portfolio_performance.js and market_discovery.js as inert JavaScript. Static relationships do not establish runtime correctness; source review, regression tests and browser checks supply separate evidence. Capture manifest and evidence are saved in the local visualization workspace under rea-portfolio-tracking.
+
+Findings and changes:
+- A source-selector child invalidated positional grid rules, stretching the selector into a large empty card. Explicit full-width rules now keep it compact and make movement/P&L panels readable on desktop and phone.
+- Daily observations previously depended on successful price refresh alone. Authenticated workspace reads and balance/token/exchange/manual-price updates now capture saved valuations. Identical routine reads are deduplicated, explicit observations are preserved, and stale workspace reads cannot invent daily returns. Day dialogs explain capture and comparison limitations. No background scheduler or historical backfill is implied.
+- INJ and GRASS ledger quote mappings were absent. Exact CoinGecko IDs were verified against the public coin catalog and added with a mapping regression. Wallet token identities remain contract-based.
+- Partial ledger P&L retains an unavailable full unrealized total but exposes an explicitly labeled known subtotal and missing symbols. Realized totals identify the number of recorded sales.
+- Movement cards preserve strict weighted-value freshness and can separately display a labeled simple mean of fresh distinct-coin returns when saved weights are stale. These are market changes, not investment P&L.
+- Crypto bubbles now offer a readable price/return table, stricter number/date/quote validation, stale-data notices and request ordering protection. Flat return charts remain centered.
+
+Validation: 54 JavaScript suites passed; targeted calendar/backend tests and quote mapping tests passed. Full backend regression and post-deployment browser results are recorded below when complete.
+
+Full backend regression: 582 tests passed with 21 optional skips. Static build and git diff --check passed.

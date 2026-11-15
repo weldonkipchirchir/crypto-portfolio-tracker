@@ -104,6 +104,10 @@ def snapshots(c,uid):
  for row in c.execute('SELECT w.id,w.chain,w.address,w.label,s.data,t.data as token_data FROM wallets w LEFT JOIN wallet_snapshots s ON s.wallet_id=w.id LEFT JOIN wallet_tokens t ON t.wallet_id=w.id WHERE w.user_id=?',(uid,)):
   item=dict(row); raw=item.pop('data'); item['snapshot']=json.loads(raw) if raw else None;tokens=item.pop('token_data');item['token_snapshot']=json.loads(tokens) if tokens else None;result.append(item)
  return result
+def capture_portfolio(c,uid,reason):
+ # Saved-state only: never fetch providers inside this database write transaction.
+ return portfolio_daily.record(c,uid,snapshots(c,uid),metadata(c,uid),exchange_connections.state(c,uid)['connections'],deduplicate=reason=='workspace_view',reason=reason)
+
 def history_state(c,uid):
  records=[];statuses=[]
  for row in c.execute('SELECT h.wallet_id,h.data,w.label,w.chain FROM chain_history h JOIN wallets w ON w.id=h.wallet_id WHERE w.user_id=?',(uid,)):
@@ -260,6 +264,11 @@ class Handler(BaseHTTPRequestHandler):
   with connect() as c:
    uid=self.user(c)
    if not uid: self.send(401,{'error':'Sign in to continue'}); return
+   c.commit()
+   if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+   else:c.execute('BEGIN IMMEDIATE')
+   if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+   capture_portfolio(c,uid,'workspace_view');c.commit()
    rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=? ORDER BY date,id',(uid,))]
    prices={r['symbol']:r['price'] for r in c.execute('SELECT * FROM prices WHERE user_id=?',(uid,))}
    records,statuses=history_state(c,uid)
@@ -380,7 +389,9 @@ class Handler(BaseHTTPRequestHandler):
       else:c.execute('BEGIN IMMEDIATE')
       if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
       actions={'/api/profile-save':lambda:account_features.save_profile(c,uid,raw),'/api/password-change':lambda:account_features.change_password(c,uid,raw),'/api/learning-note-save':lambda:account_features.save_note(c,uid,raw),'/api/learning-note-delete':lambda:account_features.delete_note(c,uid,raw),'/api/exchange-connect':lambda:exchange_connections.add(c,uid,prepared),'/api/exchange-sync':lambda:exchange_connections.sync_save(c,uid,*prepared),'/api/exchange-delete':lambda:exchange_connections.delete(c,uid,raw),'/api/chart-setup-save':lambda:workspace_features.save(c,uid,raw)}
-      result=actions[self.path]();c.commit();self.send(200,result);return
+      result=actions[self.path]()
+      if self.path in ('/api/exchange-connect','/api/exchange-sync'):capture_portfolio(c,uid,'exchange_sync')
+      c.commit();self.send(200,result);return
      if self.path=='/api/market-watchlist':self.send(200,market_watch.state(c,uid));return
      prepared_watch=None
      if self.path=='/api/market-watch-toggle':
@@ -456,7 +467,7 @@ class Handler(BaseHTTPRequestHandler):
       result['errors']=result.get('errors',[])+discovery.get('errors',[])
       result['has_more']=bool(discovery.get('has_more') or overflow)
       persist_tokens(c,wallet,result,contracts)
-      c.commit();self.send(200,{'ok':True,**result});return
+      capture_portfolio(c,uid,'token_sync');c.commit();self.send(200,{'ok':True,**result});return
      elif self.path=='/api/wallet-details':
       wallet=c.execute('SELECT id,chain,address FROM wallets WHERE user_id=? AND id=?',(uid,raw.get('id'))).fetchone()
       if not wallet: raise ValueError('Wallet not found')
@@ -469,7 +480,7 @@ class Handler(BaseHTTPRequestHandler):
         activity['items']=[{'signature':item['signature'],'slot':item['slot'],'timestamp':datetime.fromtimestamp(item['timestamp'],__import__('datetime').timezone.utc).isoformat() if item['timestamp'] is not None else None,'status':'Failed' if item['failed'] else 'Confirmed'} for item in activity.pop('activities')]
        except (ValueError,KeyError,TypeError,OverflowError):activity={'items':[],'coverage':'Recent activity could not be retrieved; retry later'}
       persist_tokens(c,wallet,result,contracts)
-      c.commit();self.send(200,{'tokens':result,'activity':activity}); return
+      capture_portfolio(c,uid,'token_sync');c.commit();self.send(200,{'tokens':result,'activity':activity}); return
      elif self.path=='/api/sync':
       wallets=[dict(r) for r in c.execute('SELECT id,chain,address FROM wallets WHERE user_id=?',(uid,))]
       if len(wallets)>50: raise ValueError('Sync supports up to 50 wallets per account')
@@ -503,7 +514,7 @@ class Handler(BaseHTTPRequestHandler):
       for identity in {r['coin_id'] for r in mail_rules}:
        symbol=next((r['symbol'] for r in mail_rules if r['coin_id']==identity and providers.COINS.get(r['symbol'])==identity),None)
        if symbol in quotes:coin_alerts.evaluate(c,uid,{'coin':{'id':identity,'current_price':quotes[symbol]['price'],'last_updated':quotes[symbol]['updated_at']}})
-      portfolio_daily.record(c,uid,snapshots(c,uid),metadata(c,uid),exchange_connections.state(c,uid)['connections'])
+      capture_portfolio(c,uid,'price_refresh')
       c.commit();delivery=alert_email.deliver(c,uid);self.send(200,{'ok':True,'target_evaluation':evaluation,'email_delivery':delivery});return
      elif self.path=='/api/remove-wallet':
       wallet=c.execute('SELECT id FROM wallets WHERE user_id=? AND id=?',(uid,raw['id'])).fetchone()
@@ -563,6 +574,7 @@ class Handler(BaseHTTPRequestHandler):
       c.execute('DELETE FROM sessions WHERE user_id=?',(uid,))
       c.commit(); self.send_response(200); self.send_header('Content-Type','application/json'); self.send_header('Set-Cookie','session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); self.end_headers(); self.wfile.write(b'{"ok":true}'); return
      else: self.send(404,{'error':'Not found'}); return
+     if self.path in ('/api/sync','/api/price'):capture_portfolio(c,uid,'balance_sync' if self.path=='/api/sync' else 'manual_price')
    self.send(200,{'ok':True})
   except sqlite3.OperationalError: self.send(503,{'error':'Portfolio storage is busy. Please retry shortly.'})
   except BudgetExceeded as e: self.send(429,{'error':str(e)})

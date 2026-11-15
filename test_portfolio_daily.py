@@ -67,6 +67,28 @@ class DailyTests(unittest.TestCase):
   save('2026-01-03',{'locked_earn_status':'unavailable'},120)
   last=portfolio_daily.calendar(self.c,1)['days'][-1]
   self.assertTrue(last['partial']);self.assertEqual(last['change'],'10')
+ def test_workspace_capture_deduplicates_and_preserves_explicit_observations(self):
+  exchange={'id':'a','snapshot':{'updated_at':1000,'balances':[{'asset':'BTC','quantity':'1','value_usd':'100','price_updated_at':1000}]}}
+  first=portfolio_daily.record(self.c,1,[],{},[exchange],1001,reason='price_refresh')
+  changes=self.c.total_changes
+  repeated=portfolio_daily.record(self.c,1,[],{},[exchange],3000,deduplicate=True,reason='workspace_view')
+  self.assertEqual(self.c.total_changes,changes);self.assertEqual(repeated,first);self.assertEqual(repeated['capture_reason'],'price_refresh')
+  exchange['snapshot']['balances'][0]['value_usd']='110'
+  updated=portfolio_daily.record(self.c,1,[],{},[exchange],3001,deduplicate=True,reason='workspace_view')
+  self.assertEqual(updated['value'],'110');self.assertEqual(updated['capture_reason'],'workspace_view')
+ def test_stale_workspace_days_are_observations_not_invented_daily_returns(self):
+  exchange={'id':'a','snapshot':{'updated_at':1000,'balances':[{'asset':'BTC','quantity':'1','value_usd':'100','price_updated_at':1000}]}}
+  portfolio_daily.record(self.c,1,[],{},[exchange],86400,reason='workspace_view')
+  portfolio_daily.record(self.c,1,[],{},[exchange],172800,reason='workspace_view')
+  days=portfolio_daily.calendar(self.c,1,172800)['days']
+  self.assertEqual(len(days),2);self.assertIsNone(days[-1]['change']);self.assertIn('stale or unverified',days[-1]['comparison_reason'])
+ def test_fresh_workspace_days_compare_actual_saved_values(self):
+  def capture(stamp,value):
+   exchange={'id':'a','snapshot':{'updated_at':stamp,'balances':[{'asset':'BTC','quantity':'1','value_usd':str(value),'price_updated_at':stamp}]}}
+   return portfolio_daily.record(self.c,1,[],{},[exchange],stamp,reason='workspace_view')
+  capture(86400,100);capture(172800,110)
+  day=portfolio_daily.calendar(self.c,1,172800)['days'][-1]
+  self.assertEqual(day['change'],'10');self.assertIsNone(day['comparison_reason'])
 import server,test_integrations,json
 from unittest.mock import patch
 class DailyAPITests(test_integrations.APITests):
@@ -78,4 +100,25 @@ class DailyAPITests(test_integrations.APITests):
   with patch('providers.market_prices',return_value={'ETH':{'price':'200','source':'Test provider','updated_at':123}}):self.call(self.a,'refresh-prices',{})
   data=self.call(self.a,'state');self.assertEqual(data['trades'],[]);self.assertEqual(data['portfolio_calendar']['days'][0]['value'],'400');self.assertIsNone(data['portfolio_calendar']['days'][0]['change'])
   self.assertEqual(self.call(self.b,'state')['portfolio_calendar']['days'],[])
+ def seed_wallet_prices(self):
+  with server.connect() as c:
+   uid=c.execute('SELECT id FROM users WHERE email=?',('a@test.com',)).fetchone()[0]
+   cursor=c.execute('INSERT INTO wallets(user_id,chain,address,label) VALUES (?,?,?,?)',(uid,'Ethereum','0x'+'1'*40,'Test wallet'))
+   c.execute('INSERT INTO wallet_snapshots VALUES (?,?)',(cursor.lastrowid,json.dumps({'quantity':'1','symbol':'ETH','updated_at':int(__import__('time').time())})))
+   c.execute('INSERT INTO prices VALUES (?,?,?)',(uid,'ETH','200'))
+   c.execute('INSERT INTO price_metadata VALUES (?,?,?,?)',(uid,'ETH','Fixture',int(__import__('time').time())))
+   c.commit();return uid
+ def test_workspace_read_saves_today_without_fetching_providers(self):
+  self.seed_wallet_prices()
+  with patch('providers.request_json',side_effect=AssertionError('state must not fetch providers')):
+   state=self.call(self.a,'state')
+  day=state['portfolio_calendar']['days'][0]
+  self.assertEqual(day['value'],'200');self.assertEqual(day['capture_reason'],'workspace_view');self.assertIsNone(day['change'])
+  self.assertEqual(self.call(self.b,'state')['portfolio_calendar']['days'],[])
+ def test_wallet_sync_saves_without_needing_price_refresh_or_state_read(self):
+  uid=self.seed_wallet_prices()
+  with patch('providers.balance',return_value={'symbol':'ETH','quantity':'2','updated_at':int(__import__('time').time())}):self.call(self.a,'sync',{})
+  with server.connect() as c:
+   day=json.loads(c.execute('SELECT data FROM portfolio_daily_values WHERE user_id=?',(uid,)).fetchone()['data'])
+  self.assertEqual(day['value'],'400');self.assertEqual(day['capture_reason'],'balance_sync')
 if __name__=='__main__':unittest.main()

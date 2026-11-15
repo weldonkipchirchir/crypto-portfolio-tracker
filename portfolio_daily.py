@@ -74,9 +74,17 @@ def observation(wallets,quotes,exchanges,now=None):
  if not priced:return None
  return {'date':datetime.fromtimestamp(now,timezone.utc).date().isoformat(),'value':str(total),'observed_at':now,'priced':priced,'unpriced':unpriced,'stale_count':stale_count,'freshness_verified':unknown_freshness==0,'unknown_freshness':unknown_freshness,'coverage_fingerprint':hashlib.sha256(json.dumps(coverage,sort_keys=True).encode()).hexdigest(),'balance_fingerprint':hashlib.sha256(json.dumps(positions,sort_keys=True).encode()).hexdigest()}
 
-def record(c,uid,wallets,quotes,exchanges,now=None):
+def record(c,uid,wallets,quotes,exchanges,now=None,*,deduplicate=False,reason='explicit_update'):
  value=observation(wallets,quotes,exchanges,now)
- if value:c.execute('INSERT INTO portfolio_daily_values(user_id,day,data) VALUES (?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET data=EXCLUDED.data',(uid,value['date'],json.dumps(value)))
+ if value:
+  previous=c.execute('SELECT data FROM portfolio_daily_values WHERE user_id=? AND day=?',(uid,value['date'])).fetchone()
+  if previous and deduplicate:
+   saved=json.loads(previous['data'])
+   fields=('value','priced','unpriced','coverage_fingerprint','balance_fingerprint')
+   # A routine read must not replace an explicit observation merely because its sources aged.
+   if all(saved.get(k)==value.get(k) for k in fields):return saved
+  value['capture_reason']=reason
+  c.execute('INSERT INTO portfolio_daily_values(user_id,day,data) VALUES (?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET data=EXCLUDED.data',(uid,value['date'],json.dumps(value)))
  return value
 
 def calendar(c,uid,now=None):
@@ -85,6 +93,10 @@ def calendar(c,uid,now=None):
  for row in rows:
   previous=by_day.get((datetime.fromisoformat(row['date']).date()-timedelta(days=1)).isoformat())
   coverage=bool(previous and (row['unpriced']==previous['unpriced']==0 or row.get('coverage_fingerprint') and row.get('coverage_fingerprint')==previous.get('coverage_fingerprint') and row['unpriced']==previous['unpriced']))
+  reason=None if coverage else ('No saved valuation for the previous UTC day.' if previous is None else 'Saved pricing coverage changed; these days are not comparable.')
+  read_stale=lambda r:r and r.get('capture_reason')=='workspace_view' and (r.get('stale_count',0)>0 or r.get('freshness_verified') is not True)
+  if read_stale(row):coverage=False;reason='This workspace observation uses stale or unverified saved inputs. Sync balances and refresh prices.'
+  elif read_stale(previous):coverage=False;reason='The previous UTC day has stale or unverified saved inputs; no daily change is inferred.'
   change=Decimal(row['value'])-Decimal(previous['value']) if coverage else None
-  days.append({**row,'partial':row['unpriced']>0,'change':str(change) if change is not None else None,'previous_value':previous['value'] if previous else None,'percentage':str(change/Decimal(previous['value'])*100) if change is not None and Decimal(previous['value'])>0 else None,'balances_changed':bool(previous and previous['balance_fingerprint']!=row['balance_fingerprint']),'provisional':row['date']==today})
- return {'days':days,'start_date':rows[0]['date'] if rows else None,'coverage':'Connected wallets and exchanges only. Last saved valuation per UTC day; today is provisional. Changes include deposits, withdrawals and balance changes, and are not flow-adjusted investment returns. Unpriced assets are excluded. Partial daily comparisons require unchanged pricing coverage; missing days or changed coverage have no daily gain/loss.'}
+  days.append({**row,'comparison_reason':reason,'partial':row['unpriced']>0,'change':str(change) if change is not None else None,'previous_value':previous['value'] if previous else None,'percentage':str(change/Decimal(previous['value'])*100) if change is not None and Decimal(previous['value'])>0 else None,'balances_changed':bool(previous and previous['balance_fingerprint']!=row['balance_fingerprint']),'provisional':row['date']==today})
+ return {'days':days,'start_date':rows[0]['date'] if rows else None,'coverage':'Connected wallets and exchanges only. Last saved valuation per UTC day; today is provisional. Workspace views and balance/price updates save observations from available data; no background tracking or missing-day backfill is implied. Changes include deposits, withdrawals and balance changes, and are not flow-adjusted investment returns. Unpriced assets are excluded. Partial daily comparisons require unchanged pricing coverage; missing days or changed coverage have no daily gain/loss.'}
