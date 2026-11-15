@@ -42,3 +42,16 @@ Integrated follow-up regression: all 53 frontend suites, 13 affected persistence
 Production follow-up browser checks: new valuation status rendered explicit partial/stale counts; live BTC candle chart and Binance USDT quote loaded; keyboard date inspection reached the first observation of the selected 30-day range; browser error log was empty. Visual QA observed a chart occupying only about 610px of a 949px workspace beside a stretched valuation card. The follow-up CSS moves metrics below a full-width chart; no pricing calculation changes.
 
 Browser follow-up identified stale stylesheet reuse across deployments: the URL without a query still exposed the pre-fix CSS rules in the active browser despite updated production content. Build now emits content-hashed URLs for allowlisted app JavaScript and CSS. Four hosted-asset tests, including exact hash URLs, passed. This fix is based on observed stylesheet content, not an inferred REA finding.
+
+## Portfolio consistency review — 2026-11-15
+
+REA CLI inspected the latest public pre-fix `portfolio_performance.js`. Evidence ID: `ev_59ca793f7637d6d3e30467d72cfe73ae9861451f1a8fb5b2e7cf60e3f1f3e3fe`. One script parsed; 9,447 AST nodes visited, no parse failures. Capture/hash manifest: `C:/Users/weldo/.codex/visualizations/2026/10/24/01a16f71-b4a0-7812-8cf8-c3590314d9b7/rea-portfolio-nov15`; retained evidence ends in `rea-portfolio-nov15-evidence.json`. Existing overview evidence is reused. These are inert shipped-artifact observations; the defects below were reproduced with source regression fixtures.
+
+- Portfolio movement, period-dollar estimates and holdings colours reject stale market/history returns. Stale holdings cannot supply current-weight dollar-change estimates. Saved values remain visible with an explicit sync label.
+- Exchange positions now select valid newest snapshots using ISO/seconds/milliseconds timestamps, consistent with overview totals. Missing quote timestamps require review.
+- Wallet asset deduplication selects newest native/token observations independently. A newer zero balance suppresses an older duplicate positive balance instead of resurrecting it.
+- Daily snapshots normalize timestamps, prefer valid newest wallet/exchange observations, use the real token `price_fetched_at` field, and fingerprint missing Flexible/Locked Earn coverage explicitly.
+
+No missing historical values, cost bases or investment returns are inferred. The new rules can show unavailable changes where old code showed plausible but stale estimates. A balance sync and price refresh are separate operations.
+
+Regression verification: all 53 frontend suites passed after the final wallet fix. Full Python regression ran 576 tests with 21 optional tests skipped. Static build and whitespace checks passed.

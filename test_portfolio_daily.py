@@ -35,6 +35,38 @@ class DailyTests(unittest.TestCase):
   result=portfolio_daily.observation(wallets,{'ETH':{'price':'200'}},[exchange,{**exchange,'id':'b'}],1000)
   self.assertEqual(result['value'],'500');self.assertEqual(result['priced'],2)
   self.assertIsNone(portfolio_daily.observation([],{},[],1000))
+ def test_timestamp_normalization_and_invalid_duplicates(self):
+  now=1800000000
+  stamp=datetime.fromtimestamp(now,timezone.utc).isoformat()
+  def connection(value,updated):return {'id':'same','snapshot':{'account_key':'same-account','updated_at':updated,'balances':[{'asset':'BTC','quantity':'1','value_usd':str(value),'price_updated_at':stamp}]}}
+  for bad in ('not-a-time',True,now+3600,1e100):
+   result=portfolio_daily.observation([],{},[connection(999,bad),connection(100,stamp)],now)
+   self.assertEqual(result['value'],'100');self.assertEqual(result['priced'],1)
+  result=portfolio_daily.observation([],{},[connection(90,now-100),connection(100,now*1000)],now)
+  self.assertEqual(result['value'],'100');self.assertTrue(result['freshness_verified']);self.assertEqual(result['stale_count'],0)
+  for invalid in (None,True,[],{},' ',1e100):self.assertIsNone(portfolio_daily.observed_time(invalid))
+ def test_latest_wallet_observation_and_real_token_quote_timestamp(self):
+  now=1800000000
+  def wallet(quantity,updated):return {'chain':'Ethereum','address':'0xabc','snapshot':{'quantity':quantity,'updated_at':updated}}
+  result=portfolio_daily.observation([wallet('9',now+3600),wallet('2',now)],{'ETH':{'price':'10','updated_at':now}},[],now)
+  self.assertEqual(result['value'],'20')
+  contract='0x'+'1'*40
+  w=wallet('0',now);w['token_snapshot']={'updated_at':now,'tokens':[{'asset_id':'Ethereum:'+contract,'contract':contract,'quantity':'2','price_usd':'5','price_fetched_at':now}]}
+  result=portfolio_daily.observation([w],{},[],now)
+  self.assertEqual(result['value'],'10');self.assertTrue(result['freshness_verified']);self.assertEqual(result['stale_count'],0)
+ def test_missing_earn_sections_are_partial_and_not_interchangeable(self):
+  def save(day,status,value):
+   now=int(datetime.fromisoformat(day).replace(tzinfo=timezone.utc).timestamp())
+   snapshot={'updated_at':now,'balances':[{'asset':'BTC','quantity':'1','value_usd':str(value),'price_updated_at':now}],**status}
+   return portfolio_daily.record(self.c,1,[],{},[{'id':'a','snapshot':snapshot}],now)
+  first=save('2026-01-01',{'earn_status':'unavailable'},100)
+  second=save('2026-01-02',{'locked_earn_status':'unavailable'},110)
+  self.assertEqual(first['unpriced'],1);self.assertEqual(second['unpriced'],1)
+  self.assertNotEqual(first['coverage_fingerprint'],second['coverage_fingerprint'])
+  self.assertIsNone(portfolio_daily.calendar(self.c,1)['days'][-1]['change'])
+  save('2026-01-03',{'locked_earn_status':'unavailable'},120)
+  last=portfolio_daily.calendar(self.c,1)['days'][-1]
+  self.assertTrue(last['partial']);self.assertEqual(last['change'],'10')
 import server,test_integrations,json
 from unittest.mock import patch
 class DailyAPITests(test_integrations.APITests):

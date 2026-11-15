@@ -7,21 +7,35 @@ import advanced_portfolio,providers
 def init(c):
  c.execute('CREATE TABLE IF NOT EXISTS portfolio_daily_values (user_id INTEGER NOT NULL,day TEXT NOT NULL,data TEXT NOT NULL,PRIMARY KEY(user_id,day))')
 
+def observed_time(stamp):
+ if isinstance(stamp,bool) or not isinstance(stamp,(str,int,float)) or isinstance(stamp,str) and not stamp.strip():return None
+ try:
+  try:
+   value=float(stamp)
+   if value>1e12:value/=1000
+  except ValueError:
+   parsed=datetime.fromisoformat(stamp.replace('Z','+00:00'))
+   value=parsed.replace(tzinfo=timezone.utc).timestamp() if parsed.tzinfo is None else parsed.timestamp()
+  if not math.isfinite(value) or value<=0:return None
+  datetime.fromtimestamp(value,timezone.utc)
+  return value
+ except (ValueError,TypeError,OverflowError,OSError):return None
+
+def snapshot_rank(stamp,now):
+ value=observed_time(stamp)
+ return value if value is not None and value<=now+60 else 0
+
 def freshness(stamps,now):
  unknown=False;old=False
  for stamp in stamps:
-  if isinstance(stamp,bool) or not isinstance(stamp,(str,int,float)):
-   unknown=True;continue
-  try:
-   value=float(stamp)
-   if not math.isfinite(value) or value<=0:unknown=True
-   elif not 0<=now-value<=900:old=True
-  except (ValueError,TypeError):unknown=True
+  value=observed_time(stamp)
+  if value is None:unknown=True
+  elif value>now+60 or now-value>900:old=True
  return unknown,old
 
 def observation(wallets,quotes,exchanges,now=None):
  now=int(time.time() if now is None else now);total=Decimal(0);priced=unpriced=stale_count=unknown_freshness=0;positions={};coverage={};seen=set()
- for a in advanced_portfolio.assets(wallets):
+ for a in sorted(advanced_portfolio.assets(wallets),key=lambda a:snapshot_rank(((a['wallet'].get('snapshot') if a['native'] else a['wallet'].get('token_snapshot')) or {}).get('updated_at'),now),reverse=True):
   w=a['wallet'];address=str(w.get('address',''));address=address.lower() if a['chain'] in providers.EVM_CHAINS else address
   key='wallet:'+a['chain']+':'+address+':'+a['asset_id']
   if key in seen:continue
@@ -32,15 +46,20 @@ def observation(wallets,quotes,exchanges,now=None):
   positions[key]=str(quantity) if quantity is not None else 'unknown'
   coverage[key]=quantity is not None and price is not None
   if quantity is None or price is None:unpriced+=1;continue
-  unknown,old=freshness([(w.get('snapshot') or {}).get('updated_at') if a['native'] else (w.get('token_snapshot') or {}).get('updated_at'),quote.get('updated_at') if a['native'] else quote.get('price_updated_at')],now)
+  unknown,old=freshness([(w.get('snapshot') or {}).get('updated_at') if a['native'] else (w.get('token_snapshot') or {}).get('updated_at'),quote.get('updated_at') if a['native'] else quote.get('price_fetched_at',quote.get('price_updated_at'))],now)
   unknown_freshness+=int(unknown);stale_count+=int(old or bool(quote.get('price_stale')) or bool((w.get('snapshot') or {}).get('error')))
   total+=quantity*price;priced+=1
  accounts=set()
- for connection in sorted(exchanges,key=lambda e:int((e.get('snapshot') or {}).get('updated_at') or 0),reverse=True):
+ for connection in sorted(exchanges,key=lambda e:snapshot_rank((e.get('snapshot') or {}).get('updated_at'),now),reverse=True):
   snap=connection.get('snapshot') or {};account=snap.get('account_key') or connection.get('id')
   if account in accounts:continue
   accounts.add(account)
-  if not snap or snap.get('error') or snap.get('earn_status') in ('partial','error'):unpriced+=1
+  missing=[]
+  if not snap or snap.get('error'):missing.append('balances')
+  if snap.get('earn_status') in ('partial','error','unavailable'):missing.append('flexible_earn:'+str(snap.get('earn_status')))
+  if snap.get('locked_earn_status') in ('partial','error','unavailable'):missing.append('locked_earn:'+str(snap.get('locked_earn_status')))
+  for section in missing:
+   coverage['account:'+str(account)+':'+section]=False;unpriced+=1
   for a in snap.get('balances',[]):
    key='exchange:'+str(account)+':'+str(a.get('asset'))+':'+str(a.get('account_type','Spot'))+':'+str(a.get('earn_kind',''))
    if key in seen:continue
