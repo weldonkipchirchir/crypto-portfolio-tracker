@@ -68,3 +68,13 @@ assert(p.trackingView({configured:true,enabled:true,last_success:historyNow/1000
 console.log('History chart and export: real dates, gap breaks, missing values, range filtering and tracking health passed.');
 
 assert(p.historyCsv([{date:'2026-11-17',value:100,priced:'=1+1'}]).includes("'=1+1"));assert(p.trackingView({configured:true,request_error:'<save failed>'}).includes('&lt;save failed&gt;'));
+
+const inspectRows=[{key:'a',source:'ledger',symbol:'AAA',label:'Ledger',quantity:1,value:100,unrealized:10,coin_id:'a'},{key:'b',source:'ledger',symbol:'BBB',label:'Ledger',quantity:1,value:0,unrealized:0,coin_id:'b'},{key:'c',source:'ledger',symbol:'CCC',label:'Other',quantity:1,value:null,unrealized:null,coin_id:'c'},{key:'d',source:'ledger',symbol:'DDD',label:'Ledger',quantity:1,value:50,unrealized:99,stale:true,coin_id:'d'}],inspectMarket=new Map([['a',{price_change_percentage_24h:4}],['b',{price_change_percentage_24h:-2}],['d',{price_change_percentage_24h:100,stale:true}]]);
+assert.deepEqual(Array.from(p.explore(inspectRows,'ledger','',false,'','lowest',inspectMarket),r=>r.key),['b','d','a','c']);
+assert.deepEqual(Array.from(p.explore(inspectRows,'ledger','',false,'','losers',inspectMarket),r=>r.key).slice(0,2),['b','a']);
+assert.deepEqual(Array.from(p.explore(inspectRows,'ledger','',false,'','pnl',inspectMarket),r=>r.key).slice(0,2),['a','b']);
+assert.equal(p.explore(inspectRows,'ledger','',false,'','value',inspectMarket,'review').length,2);assert.equal(p.explore(inspectRows,'ledger','',false,'','value',inspectMarket,'fresh').length,2);assert.equal(p.explore(inspectRows,'ledger','BBB',false,'Ledger','value',inspectMarket,'priced').length,1);
+const mobileCells=p.holdingsRows([{...inspectRows[0],label:'<unsafe>',average_buy:80,average_cost:82,cost:82,realized:3}],inspectMarket,new Map(),'30d');assert.equal((mobileCells.match(/<td /g)||[]).length,13);assert(mobileCells.includes('data-field="period_start" data-label="30D start'));assert(mobileCells.includes('data-field="unrealized" data-label="Unrealized P&amp;L"'));assert(mobileCells.includes('&lt;unsafe&gt;'));assert(!mobileCells.includes('<unsafe>'));assert(p.holdingsScope(inspectRows).includes('3 of 4 positions valued'));assert.equal(p.holdingStatus(inspectRows[3]),'Refresh price');
+console.log('Holdings explorer: quality filters, null-last and fresh-return sorting, correct mobile labels and escaped rows passed.');
+
+assert.equal(p.holdingStatus({value:10,quantity:1,stale:true,balanceStale:true}),'Sync balance');assert(p.holdingsRows([{...inspectRows[3],balanceStale:true}],inspectMarket,new Map(),'24h').includes('Refresh data to compare'));
