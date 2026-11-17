@@ -6,3 +6,5 @@ const fallback=host();m.mount(fallback,{overview:async()=>({fear_greed:{availabl
 
 
 for(const invalid of [' ',[],{},true,false,Infinity,NaN])assert.equal(m.money(invalid),'Unavailable');assert.equal(m.money('0'),'$0.00');console.log('Data values reject whitespace and object coercion instead of inventing zero prices.');
+
+(async()=>{const h=host();m.mount(h,{overview:async()=>({fear_greed:{available:false},altcoin_breadth:{available:false}}),watchlist:async()=>({coins:[]})});await flush();assert(h.innerHTML.includes('Breadth data is not available'));assert(!h.innerHTML.includes('Unavailable of Unavailable'));console.log('Missing breadth coverage has a clear recovery message instead of unavailable counts.');})().catch(e=>{console.error(e);process.exitCode=1});

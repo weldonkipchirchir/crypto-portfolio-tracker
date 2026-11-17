@@ -10,7 +10,7 @@ class Page(HTMLParser):
 class SEOTests(unittest.TestCase):
  def assertPublicScripts(self,source,name):
   scripts=[attrs for tag,attrs in Page(source).tags if tag=='script']
-  self.assertEqual(scripts,[{'src':'/landing_theme.js'}] if name=='index.html' else [])
+  self.assertEqual(scripts,[{'src':'/landing_theme.js'}])
   if name=='index.html':self.assertNotIn('<script src="/landing_theme.js">function',source)
 
  def test_sitemap_pages_have_unique_titles_descriptions_and_canonicals(self):
@@ -63,7 +63,11 @@ class SEOTests(unittest.TestCase):
    self.assertPublicScripts(source,name)
    self.assertNotIn('app.js',source)
    self.assertIn('public_site.css',source)
-  self.assertLess((ROOT/'public_site.css').stat().st_size,6000)
+  # Shared public styles include both themes and guide navigation, without the app bundle.
+  import gzip
+  public_css=(ROOT/'public_site.css').read_bytes()
+  self.assertLess(len(public_css),9000)
+  self.assertLess(len(gzip.compress(public_css)),3000)
  def test_icons_present_on_public_and_private_pages(self):
   for name in ('index.html','app.html','about-orbit.html','guides/wallet-tracking.html','guides/crypto-profit-loss.html'):
    source=(ROOT/name).read_text(encoding='utf-8')
