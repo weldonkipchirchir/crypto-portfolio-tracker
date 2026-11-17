@@ -62,7 +62,7 @@ def run(connect,read_wallets,*,now=None,seconds=45,max_accounts=200):
  with connect() as c:
   lease=c.execute('INSERT INTO portfolio_capture_runs VALUES (?,?,?,0,?) ON CONFLICT(day) DO UPDATE SET token=EXCLUDED.token,expires=EXCLUDED.expires WHERE portfolio_capture_runs.expires<=? AND portfolio_capture_runs.completed=0 RETURNING token',(day,token,now+90,'{}',now)).fetchone()
   if not lease:return {'ok':True,'status':'already_completed_or_running'}
- result={'ok':True,'day':day,'saved':0,'unpriced':0,'pending':False}
+ result={'ok':True,'day':day,'saved':0,'unpriced':0,'failed':0,'pending':False}
  try:
   with connect() as c:
    users=[r['id'] for r in c.execute("SELECT u.id FROM users u LEFT JOIN portfolio_tracking t ON t.user_id=u.id WHERE COALESCE(t.enabled,1)=1 AND COALESCE(t.last_day,'')<>? AND (EXISTS(SELECT 1 FROM wallets w WHERE w.user_id=u.id) OR EXISTS(SELECT 1 FROM exchange_connections e WHERE e.user_id=u.id)) ORDER BY COALESCE(t.last_success,0),u.id LIMIT ?",(day,max_accounts+1))]
@@ -70,8 +70,12 @@ def run(connect,read_wallets,*,now=None,seconds=45,max_accounts=200):
    if users:
     marks=','.join('?' for _ in users[:max_accounts])
     for r in c.execute('SELECT w.chain,t.data FROM wallets w JOIN wallet_tokens t ON t.wallet_id=w.id WHERE w.user_id IN ('+marks+') ORDER BY w.id LIMIT 32',tuple(users[:max_accounts])):
-     if len(r['data'])>2000000:continue
-     for a in json.loads(r['data']).get('tokens',[]):
+     if not isinstance(r['data'],str) or len(r['data'])>2000000:continue
+     try:tokens=json.loads(r['data']).get('tokens',[])
+     except (ValueError,AttributeError):continue
+     if not isinstance(tokens,list):continue
+     for a in tokens:
+      if not isinstance(a,dict):continue
       try:
        address=providers.validate_address(r['chain'],a.get('contract') or a.get('mint'))
        if a.get('asset_id')!=r['chain']+':'+address:continue
@@ -91,20 +95,26 @@ def run(connect,read_wallets,*,now=None,seconds=45,max_accounts=200):
   with ThreadPoolExecutor(max_workers=4) as pool:token_quotes=dict(pool.map(quote,contracts))
   for uid in users[:max_accounts]:
    if time.monotonic()>=cutoff-3:result['pending']=True;break
-   with connect() as c:
-    if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
-    else:c.execute('BEGIN IMMEDIATE')
-    pref=c.execute('SELECT enabled,last_day FROM portfolio_tracking WHERE user_id=?',(uid,)).fetchone()
-    if pref and (not pref['enabled'] or pref['last_day']==day):continue
-    # Re-read owner-scoped saved data under the write lock. Never persist delayed wallet IDs.
-    wallets=read_wallets(c,uid);exchanges=[{'id':r['id'],'snapshot':json.loads(r['snapshot'])} for r in c.execute('SELECT id,snapshot FROM exchange_connections WHERE user_id=?',(uid,))]
-    row=valuation(wallets,exchanges,quotes,token_quotes,now)
-    if row:
-     c.execute('INSERT INTO portfolio_daily_values VALUES (?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET data=EXCLUDED.data',(uid,day,json.dumps(row)));result['saved']+=1
-    else:result['unpriced']+=1
-    c.execute('INSERT INTO portfolio_tracking VALUES (?,1,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_day=EXCLUDED.last_day,last_attempt=EXCLUDED.last_attempt,last_success=COALESCE(EXCLUDED.last_success,portfolio_tracking.last_success),error=EXCLUDED.error',(uid,day,now,now if row else None,None if row else 'No freshly priced holdings'))
+   try:
+    with connect() as c:
+     if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+     else:c.execute('BEGIN IMMEDIATE')
+     pref=c.execute('SELECT enabled,last_day FROM portfolio_tracking WHERE user_id=?',(uid,)).fetchone()
+     if pref and (not pref['enabled'] or pref['last_day']==day):continue
+     # Re-read owner-scoped saved data under the write lock. Never persist delayed wallet IDs.
+     wallets=read_wallets(c,uid);exchanges=[{'id':r['id'],'snapshot':json.loads(r['snapshot'])} for r in c.execute('SELECT id,snapshot FROM exchange_connections WHERE user_id=?',(uid,))]
+     row=valuation(wallets,exchanges,quotes,token_quotes,now)
+     if row:
+      c.execute('INSERT INTO portfolio_daily_values VALUES (?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET data=EXCLUDED.data',(uid,day,json.dumps(row)))
+     c.execute('INSERT INTO portfolio_tracking VALUES (?,1,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_day=EXCLUDED.last_day,last_attempt=EXCLUDED.last_attempt,last_success=COALESCE(EXCLUDED.last_success,portfolio_tracking.last_success),error=EXCLUDED.error',(uid,day,now,now if row else None,None if row else 'No freshly priced holdings'))
+    result['saved' if row else 'unpriced']+=1
+   except Exception:
+    result['failed']+=1
+    try:
+     with connect() as c:c.execute('INSERT INTO portfolio_tracking(user_id,enabled,last_attempt,error) VALUES (?,1,?,?) ON CONFLICT(user_id) DO UPDATE SET last_attempt=EXCLUDED.last_attempt,error=EXCLUDED.error',(uid,now,'Daily snapshot failed; retry needed'))
+    except Exception:pass
   if len(users)>max_accounts:result['pending']=True
-  result['ok']=not result['pending']
+  result['ok']=not result['pending'] and result['failed']==0
  except Exception:
   result.update(ok=False,error='Daily capture could not finish; check scheduler logs and retry.')
  finally:

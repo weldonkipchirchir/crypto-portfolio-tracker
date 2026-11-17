@@ -58,4 +58,13 @@ const sumHTML=p.performanceSummaryView(sumState,sumRows);assert(sumHTML.includes
 const emptySummary=p.performanceSummaryView({},[]);assert(emptySummary.includes('Purchase costs and prices needed'));assert(!emptySummary.includes('$0.00'));
 console.log('Portfolio summary: source separation, valuation coverage, stale inputs, zero/missing, P&L and calendar baseline passed.');
 
-const scheduledView=p.portfolioCalendarView({portfolio_tracking:{configured:true,enabled:true,last_success:1800000000},portfolio_calendar:{days:[]}},2027);assert(scheduledView.includes('without logging in'));assert(scheduledView.includes('Pause daily tracking'));assert(scheduledView.includes('last synchronized'));assert(!p.portfolioCalendarView({portfolio_tracking:{configured:true,enabled:false}},2027).includes('Pause daily tracking'));
+const scheduledView=p.portfolioCalendarView({portfolio_tracking:{configured:true,enabled:true,last_success:1800000000},portfolio_calendar:{days:[]}},2027);assert(scheduledView.includes('without logging in'));assert(scheduledView.includes('Pause tracking'));assert(scheduledView.includes('last balance sync'));assert(!p.portfolioCalendarView({portfolio_tracking:{configured:true,enabled:false}},2027).includes('Pause tracking'));
+
+const historyNow=Date.parse('2026-11-17T12:00:00Z'),historyRows=[{date:'2026-11-15',value:'100',change:null,priced:1,unpriced:0},{date:'2026-11-17',value:'120',change:null,priced:1,unpriced:0},{date:'2026-10-01',value:90},{date:'2026-02-31',value:999},{date:'2026-11-18',value:130}];
+assert.equal(p.valueHistory(historyRows,'30',historyNow).length,2);assert.equal(p.valueHistory(historyRows,'all',historyNow).length,3);
+const gapChart=p.historyChart(historyRows,'30',historyNow);assert(gapChart.includes('gaps are not connected'));assert(gapChart.includes('120.00'));assert(!gapChart.includes(' L'));assert(p.historyChart([]).includes('Your first daily capture'));
+const exported=p.historyCsv(p.valueHistory(historyRows,'30',historyNow));assert(exported.includes('daily_value_change_usd'));assert(exported.includes('"2026-11-15","100",""'));assert(!exported.includes('null'));
+assert(p.trackingView({configured:true,enabled:true,last_success:historyNow/1000-3*86400},historyNow).includes('Capture overdue'));assert(p.trackingView({configured:true,enabled:false},historyNow).includes('Paused'));assert(p.trackingView({configured:true,error:'<bad>'},historyNow).includes('&lt;bad&gt;'));
+console.log('History chart and export: real dates, gap breaks, missing values, range filtering and tracking health passed.');
+
+assert(p.historyCsv([{date:'2026-11-17',value:100,priced:'=1+1'}]).includes("'=1+1"));assert(p.trackingView({configured:true,request_error:'<save failed>'}).includes('&lt;save failed&gt;'));

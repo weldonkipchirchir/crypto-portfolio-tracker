@@ -42,6 +42,24 @@ class BackgroundTests(unittest.TestCase):
   with server.connect() as c:
    portfolio_daily.record(c,1,server.snapshots(c,1),{'ETH':{'price':'50','updated_at':self.now-86400}},[],self.now+10,deduplicate=True,reason='workspace_view')
    row=json.loads(c.execute('SELECT data FROM portfolio_daily_values WHERE user_id=1').fetchone()[0]);self.assertEqual(row['value'],'100');self.assertEqual(row['capture_reason'],'scheduled_prices')
+ def test_account_failure_does_not_block_other_owners(self):
+  def read(c,uid):
+   if uid==1:raise ValueError('do not expose provider details')
+   return server.snapshots(c,uid)
+  with patch('providers.market_prices',return_value={'ETH':{'price':'100','updated_at':self.now}}):
+   result=bg.run(server.connect,read,now=self.now)
+  self.assertFalse(result['ok']);self.assertEqual(result['failed'],1);self.assertEqual(result['saved'],1)
+  with server.connect() as c:
+   self.assertEqual(c.execute('SELECT COUNT(*) FROM portfolio_daily_values WHERE user_id=1').fetchone()[0],0)
+   self.assertEqual(c.execute('SELECT COUNT(*) FROM portfolio_daily_values WHERE user_id=2').fetchone()[0],1)
+   self.assertEqual(bg.status(c,1)['error'],'Daily snapshot failed; retry needed')
+  self.assertEqual(self.run_job()['saved'],1)
+ def test_invalid_optional_snapshot_does_not_stop_other_accounts(self):
+  with server.connect() as c:c.execute('INSERT INTO wallet_tokens VALUES (?,?)',(1,'not-json'))
+  result=self.run_job()
+  self.assertEqual(result['failed'],1)
+  self.assertEqual(result['saved'],1)
+  self.assertFalse(result['ok'])
  def test_provider_failure_retry_and_backlog(self):
   with patch('providers.market_prices',side_effect=ValueError('provider secret must not leak')):
    r=bg.run(server.connect,server.snapshots,now=self.now);self.assertFalse(r['ok']);self.assertNotIn('secret',json.dumps(r))
