@@ -80,6 +80,7 @@ def record(c,uid,wallets,quotes,exchanges,now=None,*,deduplicate=False,reason='e
   previous=c.execute('SELECT data FROM portfolio_daily_values WHERE user_id=? AND day=?',(uid,value['date'])).fetchone()
   if previous and deduplicate:
    saved=json.loads(previous['data'])
+   if saved.get('capture_reason')=='scheduled_prices' and (value.get('stale_count',0)>0 or value.get('freshness_verified') is not True):return saved
    fields=('value','priced','unpriced','coverage_fingerprint','balance_fingerprint')
    # A routine read must not replace an explicit observation merely because its sources aged.
    if all(saved.get(k)==value.get(k) for k in fields):return saved
@@ -99,4 +100,4 @@ def calendar(c,uid,now=None):
   elif read_stale(previous):coverage=False;reason='The previous UTC day has stale or unverified saved inputs; no daily change is inferred.'
   change=Decimal(row['value'])-Decimal(previous['value']) if coverage else None
   days.append({**row,'comparison_reason':reason,'partial':row['unpriced']>0,'change':str(change) if change is not None else None,'previous_value':previous['value'] if previous else None,'percentage':str(change/Decimal(previous['value'])*100) if change is not None and Decimal(previous['value'])>0 else None,'balances_changed':bool(previous and previous['balance_fingerprint']!=row['balance_fingerprint']),'provisional':row['date']==today})
- return {'days':days,'start_date':rows[0]['date'] if rows else None,'coverage':'Connected wallets and exchanges only. Last saved valuation per UTC day; today is provisional. Workspace views and balance/price updates save observations from available data; no background tracking or missing-day backfill is implied. Changes include deposits, withdrawals and balance changes, and are not flow-adjusted investment returns. Unpriced assets are excluded. Partial daily comparisons require unchanged pricing coverage; missing days or changed coverage have no daily gain/loss.'}
+ return {'days':days,'start_date':rows[0]['date'] if rows else None,'coverage':'Connected wallets and exchanges only. Last saved valuation per UTC day; today is provisional. Workspace views and balance/price updates save observations from available data; scheduled price snapshots can run without a login when enabled. They use the last synchronized quantities, not an automatic balance sync. Missing days are not backfilled. Changes include deposits, withdrawals and balance changes, and are not flow-adjusted investment returns. Unpriced assets are excluded. Partial daily comparisons require unchanged pricing coverage; missing days or changed coverage have no daily gain/loss.'}

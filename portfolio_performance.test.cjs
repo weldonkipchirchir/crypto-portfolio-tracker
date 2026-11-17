@@ -57,3 +57,5 @@ assert.equal(p.performanceSummary({},[]).connectedValue,null);assert.equal(p.per
 const sumHTML=p.performanceSummaryView(sumState,sumRows);assert(sumHTML.includes('Connected holdings'));assert(sumHTML.includes('$100.00'));assert(!sumHTML.includes('$999'));assert(sumHTML.includes('sources kept separate'));assert(sumHTML.includes('data-performance-jump="calendar"'));
 const emptySummary=p.performanceSummaryView({},[]);assert(emptySummary.includes('Purchase costs and prices needed'));assert(!emptySummary.includes('$0.00'));
 console.log('Portfolio summary: source separation, valuation coverage, stale inputs, zero/missing, P&L and calendar baseline passed.');
+
+const scheduledView=p.portfolioCalendarView({portfolio_tracking:{configured:true,enabled:true,last_success:1800000000},portfolio_calendar:{days:[]}},2027);assert(scheduledView.includes('without logging in'));assert(scheduledView.includes('Pause daily tracking'));assert(scheduledView.includes('last synchronized'));assert(!p.portfolioCalendarView({portfolio_tracking:{configured:true,enabled:false}},2027).includes('Pause daily tracking'));

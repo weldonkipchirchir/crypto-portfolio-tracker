@@ -1,6 +1,7 @@
 """Vercel entry point. No ephemeral SQLite fallback in hosted mode."""
 import os,threading,time
 from server import Handler,init
+import portfolio_background
 import cloud_storage
 _ready=False
 _lock=threading.Lock()
@@ -19,8 +20,11 @@ class handler(Handler):
   super().end_headers()
  def dispatch(self,method):
   self._request_started=time.monotonic()
+  if self.path==portfolio_background.PATH:
+   if method!='do_GET':self.send(405,{'error':'Method not allowed'});return
+   if not self.valid_host() or not portfolio_background.authorized(self.headers):self.send(401,{'error':'Unauthorized'});return
   # Public assets must remain available during database outages and cold starts.
-  if method=='do_GET' and self.path!='/api/state':
+  if method=='do_GET' and self.path not in ('/api/state',portfolio_background.PATH):
    return super().do_GET()
   try:initialize()
   except Exception:self.send(503,{'error':'Hosted storage is not configured or unavailable'});return

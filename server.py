@@ -6,6 +6,7 @@ import token_discovery
 import token_pricing
 import alert_email
 import portfolio_daily
+import portfolio_background
 import advanced_portfolio
 import portfolio_performance
 import price_targets
@@ -78,6 +79,7 @@ def init():
   c.executescript('''CREATE TABLE IF NOT EXISTS price_metadata(user_id INTEGER,symbol TEXT,source TEXT,updated_at INTEGER,PRIMARY KEY(user_id,symbol)); CREATE TABLE IF NOT EXISTS wallet_snapshots(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS wallet_tokens(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS token_watchlist(wallet_id INTEGER PRIMARY KEY,contracts TEXT); CREATE TABLE IF NOT EXISTS imports(user_id INTEGER,digest TEXT,PRIMARY KEY(user_id,digest)); CREATE TABLE IF NOT EXISTS chain_history(wallet_id INTEGER,event_id TEXT,data TEXT,PRIMARY KEY(wallet_id,event_id)); CREATE TABLE IF NOT EXISTS history_sync(wallet_id INTEGER PRIMARY KEY,data TEXT); CREATE TABLE IF NOT EXISTS review_decisions(user_id INTEGER,review_id TEXT,status TEXT,data TEXT,PRIMARY KEY(user_id,review_id)); CREATE TABLE IF NOT EXISTS asset_bindings(user_id INTEGER,asset_id TEXT,symbol TEXT,PRIMARY KEY(user_id,asset_id),UNIQUE(user_id,symbol));''')
   advanced_portfolio.init(c)
   portfolio_daily.init(c)
+  portfolio_background.init(c)
   price_targets.init(c)
   market_watch.init(c)
   coin_alerts.init(c)
@@ -254,6 +256,9 @@ class Handler(BaseHTTPRequestHandler):
   return row[0] if row else None
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
+  if self.path==portfolio_background.PATH:
+   if not portfolio_background.authorized(self.headers):self.send(401,{'error':'Unauthorized'});return
+   result=portfolio_background.run(connect,snapshots);self.send(200 if result['ok'] else 503,result);return
   from static_assets import STATIC_FILES
   static=STATIC_FILES
   if self.path in static:
@@ -272,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
    rows=[dict(r) for r in c.execute('SELECT * FROM trades WHERE user_id=? ORDER BY date,id',(uid,))]
    prices={r['symbol']:r['price'] for r in c.execute('SELECT * FROM prices WHERE user_id=?',(uid,))}
    records,statuses=history_state(c,uid)
-   self.send(200,dict(alert_email=alert_email.state(c,uid),portfolio_calendar=portfolio_daily.calendar(c,uid),pnl_calendar=portfolio_performance.realized_calendar(rows),**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=trade_results(rows),assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
+   self.send(200,dict(alert_email=alert_email.state(c,uid),portfolio_tracking=portfolio_background.status(c,uid),portfolio_calendar=portfolio_daily.calendar(c,uid),pnl_calendar=portfolio_performance.realized_calendar(rows),**advanced_portfolio.state(c,uid),**price_targets.state(c,uid),exchanges=exchange_connections.state(c,uid)['connections'],profile=account_features.state(c,uid),network_support=network_support(),reviews=review_state(c,uid,records),history=records,history_status=statuses,email=c.execute('SELECT email FROM users WHERE id=?',(uid,)).fetchone()[0],trades=trade_results(rows),assets=calculate(rows,prices),wallets=snapshots(c,uid),price_metadata=metadata(c,uid)))
  def do_POST(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   origin=self.headers.get('Origin')
@@ -363,6 +368,11 @@ class Handler(BaseHTTPRequestHandler):
       with (__import__('cloud_storage').provider_action(uid) if os.environ.get('DATABASE_URL') else PROVIDER_BUDGET.action(uid)),coin_market.persistence(market_cache_read,market_cache_write):
        result=roadmap_features.read(c,uid,raw)
       self.send(200,result);return
+     if self.path=='/api/portfolio-tracking':
+      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+      else:c.execute('BEGIN IMMEDIATE')
+      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      result=portfolio_background.preference(c,uid,raw);c.commit();self.send(200,result);return
      if self.path=='/api/feature-action':
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')

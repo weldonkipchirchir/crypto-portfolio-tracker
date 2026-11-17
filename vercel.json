@@ -1218,5 +1218,11 @@
       "destination": "/",
       "permanent": true
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/portfolio-daily",
+      "schedule": "0 23 * * *"
+    }
   ]
 }
