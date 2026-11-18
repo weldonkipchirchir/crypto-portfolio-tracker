@@ -37,3 +37,5 @@ for filename in ['feature_workspace.js','feature_workspace.css']+['feature_'+ide
 STATIC_FILES['/analytics-architecture.svg']=('analytics-architecture.svg','image/svg+xml')
 
 STATIC_FILES['/landing_theme.js']=('landing_theme.js','text/javascript; charset=utf-8')
+
+STATIC_FILES['/theme_system.css']=('theme_system.css','text/css; charset=utf-8')

@@ -53,3 +53,5 @@ console.log('Fibonacci reversed anchors, clipping, preview, handles and extensio
 const tight=renderFib({time:1,price:40},{time:7,price:42});const labelYs=[...tight.matchAll(/class="ot-fib-label" x="[^"]+" y="([^"]+)"/g)].map(m=>Number(m[1])).sort((a,b)=>a-b);assert.equal(labelYs.length,7);for(let i=1;i<labelYs.length;i++)assert.ok(labelYs[i]-labelYs[i-1]>=14.99);assert.ok(labelYs[0]>=fg.top+12);assert.ok(labelYs.at(-1)<=fg.bottom-4);console.log('Tightly spaced Fibonacci labels remain separated inside the plot.');
 
 assert.deepEqual(t.zoomWindow(1000,880,120,240,1),{start:760,count:240});assert.deepEqual(t.zoomWindow(1000,0,120,5000),{start:0,count:1000});assert.deepEqual(t.zoomWindow(1000,100,120,60,.5),{start:130,count:60});
+
+assert.equal(t.quoteTimeLabel({price:123}),'Observation time unavailable');for(const value of [null,'',true,'bad',1e30])assert.equal(t.quoteTimeLabel({observed_at:value}),'Observation time unavailable');assert.equal(t.quoteTimeLabel({observed_at:1700000000},String),'As of 1700000000000');assert.equal(t.quoteTimeLabel({observed_at:'bad',received_at:1700000000},String),'Received 1700000000000');

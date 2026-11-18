@@ -1,0 +1,175 @@
+/* Final shared theme layer. Keep financial state colours separate from navigation. */
+:root {
+  --bg: #0c1522;
+  --panel: #142132;
+  --line: #34475f;
+  --muted: #b4c2d4;
+  --text: #edf3fb;
+  --shell-text: var(--text);
+  --border: var(--line);
+  --workspace-soft: #1b2d42;
+  --workspace-surface: var(--panel);
+  --positive: #72e4b2;
+  --negative: #ff9eae;
+  --warning: #f5ce89;
+  --info: #a2cbff;
+  --series-1: #38bdf8; --series-2: #f59e0b; --series-3: #a78bfa; --series-4: #34d399;
+  --hist-pos-strong: #22c8a0; --hist-pos-soft: #91dacc; --hist-neg-strong: #f05d79; --hist-neg-soft: #e89aa6;
+  --chart-cost: #b5aeff;
+  --chart-value: #72e4c7;
+  --calendar-gain-1: #123f36; --calendar-gain-1-text: #b7f5dc;
+  --calendar-gain-2: #18523e; --calendar-gain-2-text: #c8ffe3;
+  --calendar-gain-3: #24765b; --calendar-gain-3-text: #ffffff;
+  --calendar-gain-4: #8be8bd; --calendar-gain-4-text: #10291e;
+  --calendar-loss-1: #482735; --calendar-loss-1-text: #ffd2dc;
+  --calendar-loss-2: #633040; --calendar-loss-2-text: #ffe1e7;
+  --calendar-loss-3: #993d52; --calendar-loss-3-text: #ffffff;
+  --calendar-loss-4: #ff9baa; --calendar-loss-4-text: #3e1220;
+  --calendar-flat: #35465c; --calendar-flat-text: #e8f0f9;
+  --calendar-missing: #101d2c;
+  --calendar-baseline: #19324e;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #f3f6fb;
+  --panel: #ffffff;
+  --line: #c7d4e3;
+  --muted: #4d6179;
+  --text: #17283e;
+  --workspace-soft: #eaf0f8;
+  --positive: #116c4e;
+  --negative: #ab2945;
+  --warning: #80541a;
+  --info: #205fa8;
+  --series-1: #146b9e; --series-2: #8a5900; --series-3: #6c48aa; --series-4: #0d704f;
+  --hist-pos-strong: #117957; --hist-pos-soft: #4c9b7e; --hist-neg-strong: #ae2946; --hist-neg-soft: #b85f78;
+  --chart-cost: #6252b5;
+  --chart-value: #087868;
+  --calendar-gain-1: #e3f5ed; --calendar-gain-1-text: #174e39;
+  --calendar-gain-2: #b6e8cf; --calendar-gain-2-text: #164e38;
+  --calendar-gain-3: #63c797; --calendar-gain-3-text: #103b29;
+  --calendar-gain-4: #146c4a; --calendar-gain-4-text: #ffffff;
+  --calendar-loss-1: #fdebf0; --calendar-loss-1-text: #7f2137;
+  --calendar-loss-2: #f7c2ce; --calendar-loss-2-text: #742036;
+  --calendar-loss-3: #e9829a; --calendar-loss-3-text: #521429;
+  --calendar-loss-4: #a82343; --calendar-loss-4-text: #ffffff;
+  --calendar-flat: #dce5f0; --calendar-flat-text: #233f5b;
+  --calendar-missing: #f4f7fb;
+  --calendar-baseline: #e7effa;
+  color-scheme: light;
+}
+/* Scope to actual calendar cells and matching legend, above generic button rules. */
+:root .portfolio-month-days .portfolio-month-day,
+:root .performance-calendar-legend i { background: var(--calendar-missing); color: var(--muted); }
+:root .portfolio-month-days .portfolio-month-day.gain-1,
+:root .performance-calendar-legend i.gain-1 { background: var(--calendar-gain-1); color: var(--calendar-gain-1-text); }
+:root .portfolio-month-days .portfolio-month-day.gain-2,
+:root .performance-calendar-legend i.gain-2 { background: var(--calendar-gain-2); color: var(--calendar-gain-2-text); }
+:root .portfolio-month-days .portfolio-month-day.gain-3,
+:root .performance-calendar-legend i.gain-3 { background: var(--calendar-gain-3); color: var(--calendar-gain-3-text); }
+:root .portfolio-month-days .portfolio-month-day.gain-4,
+:root .performance-calendar-legend i.gain-4 { background: var(--calendar-gain-4); color: var(--calendar-gain-4-text); }
+:root .portfolio-month-days .portfolio-month-day.loss-1,
+:root .performance-calendar-legend i.loss-1 { background: var(--calendar-loss-1); color: var(--calendar-loss-1-text); }
+:root .portfolio-month-days .portfolio-month-day.loss-2,
+:root .performance-calendar-legend i.loss-2 { background: var(--calendar-loss-2); color: var(--calendar-loss-2-text); }
+:root .portfolio-month-days .portfolio-month-day.loss-3,
+:root .performance-calendar-legend i.loss-3 { background: var(--calendar-loss-3); color: var(--calendar-loss-3-text); }
+:root .portfolio-month-days .portfolio-month-day.loss-4,
+:root .performance-calendar-legend i.loss-4 { background: var(--calendar-loss-4); color: var(--calendar-loss-4-text); }
+
+:root .portfolio-month-days .portfolio-month-day.flat-0,
+:root .performance-calendar-legend i.flat-0 { background: var(--calendar-flat); color: var(--calendar-flat-text); }
+:root .portfolio-month-days .portfolio-month-day.baseline,
+:root .performance-calendar-legend i.baseline { background: var(--calendar-baseline); color: var(--info); border: 1px dashed var(--info); }
+:root .portfolio-month-days .portfolio-month-day.empty { background: var(--calendar-missing); color: var(--muted); border: 1px solid var(--line); }
+.portfolio-month-day { position: relative; font-weight: 650; font-variant-numeric: tabular-nums; transition: box-shadow .15s; }
+.portfolio-day-direction { position: absolute; right: 3px; bottom: 1px; font-size: 10px; line-height: 1; font-weight: 750; }
+.portfolio-month-day:hover { box-shadow: inset 0 0 0 2px currentColor; filter: none; }
+.portfolio-month-day[aria-current="date"] { outline: 2px solid var(--info); outline-offset: 2px; }
+.portfolio-month-day:focus-visible { outline: 3px solid var(--info); outline-offset: 3px; }
+.portfolio-month { background: var(--panel); box-shadow: 0 2px 10px #00000005; }
+.portfolio-month summary { color: var(--text); font-size: 14px; }
+.portfolio-month-weekdays { font-size: 11px; font-weight: 600; }
+.performance-calendar-legend { font-size: 12px; gap: 12px 18px; line-height: 1.6; }
+.performance-calendar-legend i { width: 14px; height: 14px; flex-shrink: 0; border-radius: 4px; }
+.performance-calendar-stats { font-variant-numeric: tabular-nums; }
+/* Shared reading hierarchy, status meaning and dense financial tables. */
+body, :root[data-theme="light"] body { color: var(--text); }
+#workspaceMain :is(.performance-note,.performance-tag,.performance-table small,.market-footnote,.intel-meta,.advanced-caveat,.targets-small) { font-size: 12px; line-height: 1.7; }
+#workspaceMain :is(.performance-table,.market-table-wrap table,.advanced-table-wrap table,.targets-table-wrap table) { font-size: 13px; }
+#workspaceMain :is(.performance-table,.market-table-wrap table,.advanced-table-wrap table,.targets-table-wrap table) th { font-size: 11px; line-height: 1.5; letter-spacing: .03em; color: var(--muted); }
+#workspaceMain :is(.performance-table,.market-table-wrap table,.advanced-table-wrap table,.targets-table-wrap table) td { font-size: 13px; }
+#workspaceMain :is(.feature-intro p,.analytics-guide p,.feature-filter-status,.feature-selected small,.portfolio-valuation-status p,.trade-visual td small) { opacity: 1; color: var(--muted); }
+#workspaceMain :is(.positive,.performance-gain), :root[data-theme="light"] #workspaceMain :is(.positive,.performance-gain) { color: var(--positive); }
+#workspaceMain :is(.negative,.performance-loss), :root[data-theme="light"] #workspaceMain :is(.negative,.performance-loss) { color: var(--negative); }
+#workspaceMain .portfolio-health-badge.needs-review { color: var(--warning); background: var(--panel); border-color: currentColor; }
+#workspaceMain .trade-cost-key { color: var(--chart-cost); }
+#workspaceMain .trade-value-key { color: var(--chart-value); }
+#workspaceMain :is(.feature-categories,.feature-tool-grid,.intel-groups,.intel-tabs) button[aria-pressed="true"] { background: var(--shell-active); color: var(--text); border-color: var(--shell-active-line); box-shadow: inset 0 -2px var(--shell-active-line); }
+:root[data-theme="light"] #workspaceMain .intel-workspace .intel-tabs button[aria-pressed="true"] { background: #205fa8!important; color: #fff!important; }
+.experience-workspace .experience-credentials:disabled { opacity: 1; }
+.experience-workspace .experience-credentials:disabled :is(input,button) { opacity: .6; cursor: not-allowed; }
+#workspaceMain :is(input,select,textarea), .ot-dialog :is(select,textarea), .pine-editor textarea { color: var(--text); background: var(--bg); border-color: var(--line); }
+#workspaceMain :is(input,textarea)::placeholder, #auth input::placeholder { color: var(--muted); opacity: 1; }
+#workspaceMain label { color: var(--muted); }
+#workspaceMain :is(.performance-asset,.market-coin-button) { color: var(--text); }
+#workspaceMain .table-wrap tbody tr:hover { background: var(--workspace-soft); }
+#workspaceMain .feature-selected svg text:not([fill]) { fill: var(--muted); }
+/* Chart panels and legends inherit the theme instead of a fixed dark fallback. */
+.ot-dialog, .pine-editor, .performance-dialog, .advanced-dialog { color: var(--text); background: var(--panel); border-color: var(--line); }
+.ot-chart, .ot-pane, .market-chart, .market-chart-shell { background: var(--panel); }
+.ot-dialog :is(.ot-note,.ot-status,.ot-pane-head,.ot-visible-range), .pine-editor :is(p,small) { color: var(--muted); }
+.ot-dialog .ot-study-chip { background: var(--bg); color: var(--text); }
+.ot-dialog :is(.ot-axis,.ot-pane-axis) { fill: var(--muted); }
+.ot-dialog .ot-grid { stroke: var(--line); }
+:root[data-theme="light"] .ot-dialog .ot-study-line { filter: brightness(.62); }
+:root[data-theme="light"] .ot-dialog .ot-study-hit { filter: none; }
+:root[data-theme="light"] .ot-dialog .ot-study-chip { border-color: var(--line); }
+:root[data-theme="light"] #workspaceMain .market-stats>div { background: linear-gradient(145deg,#fff,#edf3fa); }
+:root:not([data-theme="light"]) #workspaceMain :is(.advanced-stat,.market-stats>div) { background: linear-gradient(145deg,#1a2b40,#142132); }
+:root:not([data-theme="light"]) #workspaceMain :is(.notice,.targets-scope,.targets-rule,.targets-quote) { background: #192c3b; color: var(--muted); border-color: var(--line); }
+#auth :is(h1,h2,label), #sessionRestore h1 { color: var(--text); }
+#auth :is(.auth-save-note,.small,#authDescription) { color: var(--muted); }
+:root[data-theme="light"] #auth .auth-story em { color: #12654c; }
+@media(max-width:650px) {
+  .portfolio-month-day { min-height: 40px; font-size: 12px; }
+  .portfolio-day-direction { right: 5px; bottom: 3px; font-size: 11px; }
+  #workspaceMain .performance-head h2 { font-size: 20px; }
+  #workspaceMain :is(.performance-note,.market-footnote,.intel-meta) { font-size: 12px; }
+}
+@media(forced-colors:active) {
+  .portfolio-month-day { border: 1px solid CanvasText!important; }
+  .portfolio-day-direction { color: CanvasText; }
+  .portfolio-month-day[aria-current="date"] { outline-color: Highlight; }
+}
+@media(prefers-reduced-motion:reduce) { .portfolio-month-day { transition: none; } }
+
+#workspaceMain .portfolio-valuation-status p { font-size: 12px; opacity: 1; line-height: 1.75; }
+
+/* Populated order-flow ladders and their chart marks share readable bid/ask colours. */
+#research .intel-workspace .intel-up, #research .depth-ladder-row.bids span:first-child { color: var(--positive); }
+#research .intel-workspace .intel-down, #research .depth-ladder-row.asks span:first-child { color: var(--negative); }
+#research .depth-readout { background: var(--workspace-soft); color: var(--text); }
+#research .intel-radar-tile .intel-tile-identity { opacity: 1; font-size: 12px; }
+#research :is(.depth-ladder-head,.depth-ladder-row) { font-size: 12px; }
+#research svg [stroke="#20b9a6"] { stroke: var(--positive); }
+#research svg [fill="#20b9a6"] { fill: var(--positive); }
+#research svg [stroke="#e36e79"] { stroke: var(--negative); }
+#research svg [fill="#e36e79"] { fill: var(--negative); }
+
+:root[data-theme="light"] .ot-dialog .ot-pane-line { filter: brightness(.62); }
+.ot-dialog [data-ot-panel="macd"] rect[fill="#22c8a0"] { fill: var(--hist-pos-strong); }
+.ot-dialog [data-ot-panel="macd"] rect[fill="#91dacc"] { fill: var(--hist-pos-soft); }
+.ot-dialog [data-ot-panel="macd"] rect[fill="#f05d79"] { fill: var(--hist-neg-strong); }
+.ot-dialog [data-ot-panel="macd"] rect[fill="#e89aa6"] { fill: var(--hist-neg-soft); }
+
+#auth input { background: var(--bg); color: var(--text); border-color: var(--line); font-size: 15px; }
+#auth .auth-password-control { background: var(--bg); border-color: var(--line); }
+#auth .auth-password-control input { background: transparent; }
+#auth .auth-tabs button[aria-pressed="true"] { background: var(--workspace-soft); color: var(--text); border-color: var(--info); box-shadow: inset 0 -2px var(--info); }
+#authPasswordToggle { min-height: 44px; }
+@media(max-width:650px) { #auth input { font-size: 16px; } }
+
+/* Authentication owns its scrolling; keep the inert workspace from adding a second scrollbar. */
+body:has(> #auth:not(.hidden)), body:has(> #sessionRestore:not(.hidden)) { overflow: hidden; }
