@@ -173,3 +173,10 @@ body, :root[data-theme="light"] body { color: var(--text); }
 
 /* Authentication owns its scrolling; keep the inert workspace from adding a second scrollbar. */
 body:has(> #auth:not(.hidden)), body:has(> #sessionRestore:not(.hidden)) { overflow: hidden; }
+
+/* Keep the brand, navigation and theme switch on one row on narrow phones. */
+@media(max-width:360px) {
+  body>aside { padding-inline: 10px; column-gap: 6px; }
+  body>aside .brand { display: inline-flex; align-items: center; white-space: nowrap; gap: 4px; padding: 0 3px; font-size: 21px; }
+  body>aside .shell-menu-toggle { margin-right: 100px; min-width: 54px; padding-inline: 7px; font-size: 11px; }
+}

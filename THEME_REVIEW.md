@@ -25,3 +25,7 @@
 Screenshots and disposable fixtures are outside the repository in the theme-review artifact directory. This pass is UI and readability QA, not a full accessibility certification, provider coverage validation or load/security test. Complex blended backgrounds, forced-colour behaviour and system preference changes were covered by selected CSS/unit checks rather than exhaustive OS/browser combinations.
 
 Shared theme stylesheet: 12,649 raw bytes / 3,164 gzip bytes. It is explicitly allowlisted for static hosting and loaded after component styles.
+
+## Follow-up recheck
+
+Rechecked all eleven workspace pages in both themes at 320px, including refresh/session/theme restoration, Studio, calendar colours and day details. Calendar dates retained 40px targets and day details matched the synthetic $860 / $850 values (+$10, +1.18%). Found one additional narrow-screen issue: the brand wrapped beside Menu and theme controls. Adjusted the <=360px header spacing and verified no control overlap at 320px, 360px and 390px. Menu/Escape and light/dark native control changes passed; no browser console errors were captured. The six deployed core assets matched source before this follow-up change; the updated theme stylesheet is checked again after deployment.
