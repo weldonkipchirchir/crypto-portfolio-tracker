@@ -159,8 +159,8 @@ def watched_contracts(c,wallet,raw=None):
  saved=c.execute('SELECT contracts FROM token_watchlist WHERE wallet_id=?',(wallet['id'],)).fetchone()
  return json.loads(saved['contracts']) if saved else []
 
-def persist_tokens(c,wallet,result,contracts):
- previous=c.execute('SELECT data FROM wallet_tokens WHERE wallet_id=?',(wallet['id'],)).fetchone()
+def persist_tokens(c,wallet,result,contracts,*,before_write):
+ previous=c.execute('SELECT t.data FROM wallet_tokens t JOIN wallets w ON w.id=t.wallet_id WHERE w.user_id=? AND w.id=? AND w.chain=? AND w.address=?',(wallet['user_id'],wallet['id'],wallet['chain'],wallet['address'])).fetchone()
  old=json.loads(previous['data']) if previous else {}
  old_prices={token['asset_id']:token for token in old.get('tokens',[])}
  for token in result.get('tokens',[]):
@@ -174,8 +174,11 @@ def persist_tokens(c,wallet,result,contracts):
  result['tokens']=list(current.values())
  enriched=token_pricing.enrich(wallet['chain'],result)
  result.clear();result.update(enriched)
+ # All provider enrichment finishes before the authenticated apply transaction.
+ if not before_write():return False
  c.execute('INSERT OR REPLACE INTO wallet_tokens VALUES (?,?)',(wallet['id'],json.dumps(result)))
  if wallet['chain'] in providers.EVM_CHAINS:c.execute('INSERT OR REPLACE INTO token_watchlist VALUES (?,?)',(wallet['id'],json.dumps(contracts)))
+ return True
 
 def sync_wallet(w,cutoff=None):
  try:
@@ -254,6 +257,18 @@ class Handler(BaseHTTPRequestHandler):
   token=next((x.strip()[8:] for x in self.headers.get('Cookie','').split(';') if x.strip().startswith('session=')),'')
   row=c.execute('SELECT user_id FROM sessions WHERE token=? AND expires>?',(hashlib.sha256(token.encode()).hexdigest(),time.time())).fetchone()
   return row[0] if row else None
+ def wallet_write_guard(self,c,uid,wallets):
+  """Apply provider results only to the same live session and wallet identities."""
+  c.commit()
+  if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
+  else:c.execute('BEGIN IMMEDIATE')
+  if self.user(c)!=uid:
+   self.send(401,{'error':'Session expired. Sign in again.'});return False
+  for expected in wallets:
+   current=c.execute('SELECT id,chain,address,user_id FROM wallets WHERE user_id=? AND id=?',(uid,expected['id'])).fetchone()
+   if not current or any(current[key]!=expected[key] for key in ('id','chain','address')):
+    self.send(409,{'error':'Wallet connections changed while loading. Refresh and retry.'});return False
+  return True
  def do_GET(self):
   if not self.valid_host(): self.send(403,{'error':'Invalid host'}); return
   if self.path==portfolio_background.PATH:
@@ -409,7 +424,7 @@ class Handler(BaseHTTPRequestHandler):
       exists=c.execute('SELECT coin_id FROM market_favorites WHERE user_id=? AND coin_id=?',(uid,identity)).fetchone();c.commit()
       if not exists:
        with coin_market.persistence(market_cache_read,market_cache_write):prepared_watch=market_watch.resolve(identity)
-     if self.path in ('/api/trade','/api/trade-update','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove','/api/market-watch-toggle'):
+     if self.path in ('/api/trade','/api/trade-update','/api/import','/api/delete','/api/review','/api/checkpoint','/api/watch-toggle','/api/target-save','/api/target-remove','/api/market-watch-toggle','/api/remove-wallet','/api/logout','/api/price'):
       if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
       else:c.execute('BEGIN IMMEDIATE')
       if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
@@ -445,7 +460,7 @@ class Handler(BaseHTTPRequestHandler):
        c.commit();self.send(200,{'ok':True,'added':count});return
       else:raise ValueError('Choose confirm or dismiss')
      elif self.path=='/api/history':
-      wallet=c.execute('SELECT id,chain,address FROM wallets WHERE user_id=? AND id=?',(uid,raw.get('id'))).fetchone()
+      wallet=c.execute('SELECT id,chain,address,user_id FROM wallets WHERE user_id=? AND id=?',(uid,raw.get('id'))).fetchone()
       if not wallet: raise ValueError('Wallet not found')
       old=c.execute('SELECT data FROM history_sync WHERE wallet_id=?',(wallet['id'],)).fetchone()
       previous=json.loads(old['data']) if old else {}
@@ -455,18 +470,20 @@ class Handler(BaseHTTPRequestHandler):
       try:
        result=history.fetch_history(wallet['chain'],wallet['address'],previous.get('cursors') if more else None)
        if not isinstance(result.get('items'),list) or len(result['items'])>200:raise ValueError('History provider returned too many records')
-       for item in result['items']:
-        c.execute('INSERT OR REPLACE INTO chain_history VALUES (?,?,?)',(wallet['id'],item['event_id'],json.dumps(item)))
-       details={k:v for k,v in result.items() if k!='items'}
-       details['adapter_version']=2
-       c.execute('INSERT OR REPLACE INTO history_sync VALUES (?,?)',(wallet['id'],json.dumps(details)))
-       c.commit();self.send(200,{'ok':True,'fetched':len(result['items']),'has_more':any(result.get('cursors',{}).values()),'coverage':result.get('coverage','')});return
       except ValueError as error:
+       if not self.wallet_write_guard(c,uid,[wallet]):return
        details={**previous,'error':str(error),'attempted_at':int(time.time()),'adapter_version':2}
        c.execute('INSERT OR REPLACE INTO history_sync VALUES (?,?)',(wallet['id'],json.dumps(details)))
        c.commit();self.send(200,{'ok':False,'fetched':0,'error':str(error)});return
+      if not self.wallet_write_guard(c,uid,[wallet]):return
+      for item in result['items']:
+       c.execute('INSERT OR REPLACE INTO chain_history VALUES (?,?,?)',(wallet['id'],item['event_id'],json.dumps(item)))
+      details={k:v for k,v in result.items() if k!='items'}
+      details['adapter_version']=2
+      c.execute('INSERT OR REPLACE INTO history_sync VALUES (?,?)',(wallet['id'],json.dumps(details)))
+      c.commit();self.send(200,{'ok':True,'fetched':len(result['items']),'has_more':any(result.get('cursors',{}).values()),'coverage':result.get('coverage','')});return
      elif self.path=='/api/discover-tokens':
-      wallet=c.execute('SELECT id,chain,address FROM wallets WHERE user_id=? AND id=?',(uid,raw.get('id'))).fetchone()
+      wallet=c.execute('SELECT id,chain,address,user_id FROM wallets WHERE user_id=? AND id=?',(uid,raw.get('id'))).fetchone()
       if not wallet:raise ValueError('Wallet not found')
       watched=watched_contracts(c,wallet,raw.get('contracts'))
       discovery=token_discovery.discover(wallet['chain'],wallet['address'])
@@ -476,10 +493,10 @@ class Handler(BaseHTTPRequestHandler):
       result['coverage']=discovery['coverage']+' '+result.get('coverage','') if wallet['chain'] in providers.EVM_CHAINS else result.get('coverage',discovery['coverage'])
       result['errors']=result.get('errors',[])+discovery.get('errors',[])
       result['has_more']=bool(discovery.get('has_more') or overflow)
-      persist_tokens(c,wallet,result,contracts)
+      if not persist_tokens(c,wallet,result,contracts,before_write=lambda:self.wallet_write_guard(c,uid,[wallet])):return
       capture_portfolio(c,uid,'token_sync');c.commit();self.send(200,{'ok':True,**result});return
      elif self.path=='/api/wallet-details':
-      wallet=c.execute('SELECT id,chain,address FROM wallets WHERE user_id=? AND id=?',(uid,raw.get('id'))).fetchone()
+      wallet=c.execute('SELECT id,chain,address,user_id FROM wallets WHERE user_id=? AND id=?',(uid,raw.get('id'))).fetchone()
       if not wallet: raise ValueError('Wallet not found')
       contracts=watched_contracts(c,wallet,raw.get('contracts'))
       result=token_integrations.token_balances(wallet['chain'],wallet['address'],contracts,include_metadata=True)
@@ -489,13 +506,14 @@ class Handler(BaseHTTPRequestHandler):
         activity=token_integrations.recent_activity(wallet['chain'],wallet['address'])
         activity['items']=[{'signature':item['signature'],'slot':item['slot'],'timestamp':datetime.fromtimestamp(item['timestamp'],__import__('datetime').timezone.utc).isoformat() if item['timestamp'] is not None else None,'status':'Failed' if item['failed'] else 'Confirmed'} for item in activity.pop('activities')]
        except (ValueError,KeyError,TypeError,OverflowError):activity={'items':[],'coverage':'Recent activity could not be retrieved; retry later'}
-      persist_tokens(c,wallet,result,contracts)
+      if not persist_tokens(c,wallet,result,contracts,before_write=lambda:self.wallet_write_guard(c,uid,[wallet])):return
       capture_portfolio(c,uid,'token_sync');c.commit();self.send(200,{'tokens':result,'activity':activity}); return
      elif self.path=='/api/sync':
-      wallets=[dict(r) for r in c.execute('SELECT id,chain,address FROM wallets WHERE user_id=?',(uid,))]
+      wallets=[dict(r) for r in c.execute('SELECT id,chain,address,user_id FROM wallets WHERE user_id=?',(uid,))]
       if len(wallets)>50: raise ValueError('Sync supports up to 50 wallets per account')
       with ThreadPoolExecutor(max_workers=6) as pool:
        results=list(pool.map(sync_wallet,wallets))
+      if not self.wallet_write_guard(c,uid,wallets):return
       for wid,result in results:
        if 'error' in result:
         old=c.execute('SELECT data FROM wallet_snapshots WHERE wallet_id=?',(wid,)).fetchone()
@@ -510,13 +528,12 @@ class Handler(BaseHTTPRequestHandler):
       if not quotes: raise ValueError('No price quotes returned. Please retry later.')
       with coin_market.persistence(market_cache_read,market_cache_write):exchange_updates=exchange_connections.reprice_snapshots(c,uid)
       token_updates=[]
-      for row in c.execute('SELECT t.wallet_id,t.data,w.chain FROM wallet_tokens t JOIN wallets w ON w.id=t.wallet_id WHERE w.user_id=?',(uid,)):
-       updated=token_pricing.enrich(row['chain'],json.loads(row['data']));token_updates.append((row['wallet_id'],json.dumps(updated)))
-      if getattr(c,'dialect',None)=='postgres':c.execute('SELECT pg_advisory_xact_lock(?)',(uid,))
-      else:c.execute('BEGIN IMMEDIATE')
-      if self.user(c)!=uid:self.send(401,{'error':'Session expired. Sign in again.'});return
+      token_rows=list(c.execute('SELECT t.wallet_id,t.data,w.chain,w.address FROM wallet_tokens t JOIN wallets w ON w.id=t.wallet_id WHERE w.user_id=?',(uid,)))
+      for row in token_rows:
+       updated=token_pricing.enrich(row['chain'],json.loads(row['data']));token_updates.append(({'id':row['wallet_id'],'chain':row['chain'],'address':row['address']},json.dumps(updated)))
+      if not self.wallet_write_guard(c,uid,[wallet for wallet,data in token_updates]):return
       for data,owner,identity in exchange_updates:c.execute('UPDATE exchange_connections SET snapshot=? WHERE user_id=? AND id=?',(data,owner,identity))
-      for wallet_id,data in token_updates:c.execute('INSERT OR REPLACE INTO wallet_tokens VALUES (?,?)',(wallet_id,data))
+      for wallet,data in token_updates:c.execute('INSERT OR REPLACE INTO wallet_tokens VALUES (?,?)',(wallet['id'],data))
       for symbol,quote in quotes.items():
        c.execute('INSERT OR REPLACE INTO prices VALUES (?,?,?)',(uid,symbol,quote['price']))
        c.execute('INSERT OR REPLACE INTO price_metadata VALUES (?,?,?,?)',(uid,symbol,quote['source'],quote['updated_at']))

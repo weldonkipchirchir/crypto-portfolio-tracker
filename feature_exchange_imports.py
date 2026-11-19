@@ -2,6 +2,7 @@
 import hashlib,hmac,json,re,time,urllib.request
 from urllib.parse import urlencode
 from decimal import Decimal
+from csv_safety import spreadsheet_text
 import exchange_connections as ex
 import exchange_trade_imports as fills
 
@@ -129,7 +130,7 @@ def normalize_activity(rows,kind,start,end):
 def activity_csv(events):
  out=io.StringIO();writer=csv_module.writer(out);writer.writerow(ACTIVITY_FIELDS)
  # Preserve exact JSON values; neutralize spreadsheet formula prefixes in CSV.
- for event in events:writer.writerow(["'"+str(event[key]) if str(event[key]).startswith(('=','+','-','@')) else event[key] for key in ACTIVITY_FIELDS])
+ for event in events:writer.writerow([event[key] if key in ('amount_native','fee_native','status_code') else spreadsheet_text(event[key]) for key in ACTIVITY_FIELDS])
  return out.getvalue()
 
 _fills_read=read

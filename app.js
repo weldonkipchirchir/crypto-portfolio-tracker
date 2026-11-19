@@ -70,7 +70,7 @@ function download(text,name){const url=URL.createObjectURL(new Blob([text],{type
 
 $('template').onclick=()=>download('date,symbol,side,quantity,price,fee,account\n2026-01-01T12:00:00,ETH,buy,1,2500,5,Example exchange\n','orbit-template.csv');
 
-$('export').onclick=()=>{const keys=['date','symbol','side','quantity','price','fee','account'];download(keys.join(',')+'\n'+state.trades.map(t=>keys.map(k=>'"'+String((k==='account'&&/^[=+@\-\t\r]/.test(String(t[k])))?"'"+t[k]:t[k]).replace(/"/g,'""')+'"').join(',')).join('\n'),'orbit-trades.csv')};
+$('export').onclick=()=>{const safe=window.OrbitPerformance?.spreadsheetText;if(typeof safe!=='function'){toast('CSV export is unavailable. Reload the workspace and try again.');return}const keys=['date','symbol','side','quantity','price','fee','account'];download(keys.join(',')+'\n'+state.trades.map(t=>keys.map(k=>'"'+String(k==='account'?safe(t[k]):t[k]).replace(/"/g,'""')+'"').join(',')).join('\n'),'orbit-trades.csv')};
 
 $('providers').innerHTML=[['Ethereum / Optimism / BNB','Balances + history (BNB API key required)'],['Solana','Native + SPL + parsed transaction history'],['Aptos','Native balances + signed-account history'],['Sui','Native balances + GraphQL history'],['MetaMask / Trust Wallet','Public address import'],['Exchanges / Robinhood','CSV imports only']].map(([name,status])=>`<div class="connection"><h3>${name}</h3><span class="pill">${status}</span><p>Full trade history sync is pending.</p></div>`).join('');
 

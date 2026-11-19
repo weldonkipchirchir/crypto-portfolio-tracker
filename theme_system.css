@@ -180,3 +180,23 @@ body:has(> #auth:not(.hidden)), body:has(> #sessionRestore:not(.hidden)) { overf
   body>aside .brand { display: inline-flex; align-items: center; white-space: nowrap; gap: 4px; padding: 0 3px; font-size: 21px; }
   body>aside .shell-menu-toggle { margin-right: 100px; min-width: 54px; padding-inline: 7px; font-size: 11px; }
 }
+
+/* Thumb-friendly primary destinations, with the complete menu still available. */
+.phone-navigation { display: none; margin: 0; overflow: visible; }
+@media(max-width:650px) {
+ .phone-navigation { position: fixed; z-index: 9; left: 10px; right: 10px; bottom: 8px; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 2px; padding: 6px 5px calc(6px + env(safe-area-inset-bottom,0px)); border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: 0 -4px 24px #0000001a; }
+ .phone-navigation button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; min-width: 0; min-height: 50px; padding: 7px 2px; color: var(--muted); background: transparent; border: 1px solid transparent; border-radius: 11px; font-size: 11px; line-height: 1.3; }
+ .phone-navigation button>span:first-child { font-size: 19px; line-height: 1; }
+ .phone-navigation button.active { background: var(--shell-active); color: var(--text); border-color: var(--shell-active-line); }
+ .phone-navigation button:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+ body>main { padding-bottom: calc(125px + env(safe-area-inset-bottom,0px)); }
+ .experience-back { bottom: calc(88px + env(safe-area-inset-bottom,0px)); }
+ body:has(> #auth:not(.hidden)) .phone-navigation, body:has(> #sessionRestore:not(.hidden)) .phone-navigation, body:has(> aside.shell-menu-open) .phone-navigation, body:has(dialog[open]) .phone-navigation { display: none; margin: 0; overflow: visible; }
+}
+@media(forced-colors:active) { .phone-navigation { background: Canvas; border-color: ButtonText; } .phone-navigation button.active { outline: 2px solid Highlight; } }
+
+/* On phones the Back action belongs above the page, clear of financial figures. */
+@media(max-width:650px) {
+ #workspaceMain>.experience-back { position: static; width: max-content; min-height: 40px; margin: 0 0 4px; padding: 9px 12px; }
+ #workspaceMain>.experience-back:not(.hidden)+.heading { margin-top: 12px; }
+}
