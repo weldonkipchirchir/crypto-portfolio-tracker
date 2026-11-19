@@ -5,7 +5,8 @@ from datetime import datetime,timezone
 from decimal import Decimal,localcontext
 import providers,portfolio_daily,token_pricing,coin_market,exchange_connections
 PATH='/api/cron/portfolio-daily'
-SCHEDULE='0 23 * * *'
+SCHEDULE='0 21 * * *'
+RECOVERY_SCHEDULE='0 23 * * *'
 
 def authorized(headers):
  secret=os.environ.get('CRON_SECRET','')
@@ -17,7 +18,7 @@ def init(c):
 
 def status(c,uid):
  row=c.execute('SELECT enabled,last_attempt,last_success,error FROM portfolio_tracking WHERE user_id=?',(uid,)).fetchone()
- return {'enabled':bool(row['enabled']) if row else True,'configured':os.environ.get('VERCEL')=='1' and bool(re.fullmatch(r'[A-Za-z0-9_-]{32,256}',os.environ.get('CRON_SECRET',''))),'schedule_utc':'23:00â€“23:59 UTC daily','last_attempt':row['last_attempt'] if row else None,'last_success':row['last_success'] if row else None,'error':row['error'] if row else None,'basis':'Refreshed prices Ã— last synchronized balances. No automatic balance sync or missing-day backfill.'}
+ return {'enabled':bool(row['enabled']) if row else True,'configured':os.environ.get('VERCEL')=='1' and bool(re.fullmatch(r'[A-Za-z0-9_-]{32,256}',os.environ.get('CRON_SECRET',''))),'schedule_utc':'21:00-21:59 UTC daily; recovery at 23:00-23:59 UTC','last_attempt':row['last_attempt'] if row else None,'last_success':row['last_success'] if row else None,'error':row['error'] if row else None,'basis':'Refreshed prices Ã— last synchronized balances. No automatic balance sync or missing-day backfill.'}
 
 def preference(c,uid,raw):
  enabled=raw.get('enabled')
@@ -65,7 +66,7 @@ def run(connect,read_wallets,*,now=None,seconds=45,max_accounts=200):
  result={'ok':True,'day':day,'saved':0,'unpriced':0,'failed':0,'pending':False}
  try:
   with connect() as c:
-   users=[r['id'] for r in c.execute("SELECT u.id FROM users u LEFT JOIN portfolio_tracking t ON t.user_id=u.id WHERE COALESCE(t.enabled,1)=1 AND COALESCE(t.last_day,'')<>? AND (EXISTS(SELECT 1 FROM wallets w WHERE w.user_id=u.id) OR EXISTS(SELECT 1 FROM exchange_connections e WHERE e.user_id=u.id)) ORDER BY COALESCE(t.last_success,0),u.id LIMIT ?",(day,max_accounts+1))]
+   users=[r['id'] for r in c.execute("SELECT u.id FROM users u LEFT JOIN portfolio_tracking t ON t.user_id=u.id WHERE COALESCE(t.enabled,1)=1 AND COALESCE(t.last_day,'')<>? AND (EXISTS(SELECT 1 FROM wallets w WHERE w.user_id=u.id) OR EXISTS(SELECT 1 FROM exchange_connections e WHERE e.user_id=u.id)) ORDER BY COALESCE(t.last_attempt,0),u.id LIMIT ?",(day,max_accounts+1))]
    contracts=[]
    if users:
     marks=','.join('?' for _ in users[:max_accounts])
@@ -106,7 +107,7 @@ def run(connect,read_wallets,*,now=None,seconds=45,max_accounts=200):
      row=valuation(wallets,exchanges,quotes,token_quotes,now)
      if row:
       c.execute('INSERT INTO portfolio_daily_values VALUES (?,?,?) ON CONFLICT(user_id,day) DO UPDATE SET data=EXCLUDED.data',(uid,day,json.dumps(row)))
-     c.execute('INSERT INTO portfolio_tracking VALUES (?,1,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_day=EXCLUDED.last_day,last_attempt=EXCLUDED.last_attempt,last_success=COALESCE(EXCLUDED.last_success,portfolio_tracking.last_success),error=EXCLUDED.error',(uid,day,now,now if row else None,None if row else 'No freshly priced holdings'))
+     c.execute('INSERT INTO portfolio_tracking VALUES (?,1,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET last_day=EXCLUDED.last_day,last_attempt=EXCLUDED.last_attempt,last_success=COALESCE(EXCLUDED.last_success,portfolio_tracking.last_success),error=EXCLUDED.error',(uid,day if row else None,now,now if row else None,None if row else 'No freshly priced holdings; retry needed'))
     result['saved' if row else 'unpriced']+=1
    except Exception:
     result['failed']+=1
@@ -114,7 +115,7 @@ def run(connect,read_wallets,*,now=None,seconds=45,max_accounts=200):
      with connect() as c:c.execute('INSERT INTO portfolio_tracking(user_id,enabled,last_attempt,error) VALUES (?,1,?,?) ON CONFLICT(user_id) DO UPDATE SET last_attempt=EXCLUDED.last_attempt,error=EXCLUDED.error',(uid,now,'Daily snapshot failed; retry needed'))
     except Exception:pass
   if len(users)>max_accounts:result['pending']=True
-  result['ok']=not result['pending'] and result['failed']==0
+  result['ok']=not result['pending'] and result['failed']==0 and result['unpriced']==0
  except Exception:
   result.update(ok=False,error='Daily capture could not finish; check scheduler logs and retry.')
  finally:

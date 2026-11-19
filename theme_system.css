@@ -1,13 +1,13 @@
 /* Final shared theme layer. Keep financial state colours separate from navigation. */
 :root {
-  --bg: #0c1522;
-  --panel: #142132;
-  --line: #34475f;
-  --muted: #b4c2d4;
-  --text: #edf3fb;
+  --bg: #10151c;
+  --panel: #181f28;
+  --line: #3a4655;
+  --muted: #b5c0ce;
+  --text: #eff3f8;
   --shell-text: var(--text);
   --border: var(--line);
-  --workspace-soft: #1b2d42;
+  --workspace-soft: #222d3a;
   --workspace-surface: var(--panel);
   --positive: #72e4b2;
   --negative: #ff9eae;
@@ -200,3 +200,33 @@ body:has(> #auth:not(.hidden)), body:has(> #sessionRestore:not(.hidden)) { overf
  #workspaceMain>.experience-back { position: static; width: max-content; min-height: 40px; margin: 0 0 4px; padding: 9px 12px; }
  #workspaceMain>.experience-back:not(.hidden)+.heading { margin-top: 12px; }
 }
+
+/* Calm neutral surfaces; reserve saturated colours for financial meaning. */
+:root:not([data-theme="light"]) { --shell-active: #27394a; --shell-active-line: #92b8df; }
+:root:not([data-theme="light"]) body { background: var(--bg); }
+:root:not([data-theme="light"]) body>aside,
+:root:not([data-theme="light"]) .phone-navigation { background: #181f28; box-shadow: 0 8px 30px #00000030; }
+:root:not([data-theme="light"]) #workspaceMain :is(.panel,.performance-panel,.intel-card,.advanced-card,.tracking-card,.feature-intro) { background: var(--panel); border-color: var(--line); box-shadow: 0 3px 16px #00000012; }
+:root:not([data-theme="light"]) #workspaceMain :is(.performance-calendar-status,.portfolio-valuation-status,.depth-readout) { background: var(--workspace-soft); }
+/* Keep native pickers: mobile browsers supply their accessible touch selection UI. */
+body select, #workspaceMain select, dialog select, #auth select {
+ appearance: auto; -webkit-appearance: menulist; font: inherit; line-height: 1.5;
+ min-height: 44px; padding: 10px 12px; max-width: 100%; min-width: 0;
+ color: var(--text); background-color: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+ text-overflow: ellipsis; cursor: pointer;
+}
+#workspaceMain select:focus-visible, dialog select:focus-visible { outline: 2px solid var(--info); outline-offset: 3px; }
+#workspaceMain select option, dialog select option { color: var(--text); background: var(--panel); }
+@media(max-width:650px) {
+ body select, #workspaceMain select, dialog select, #auth select { font-size: 16px; min-height: 48px; width: 100%; }
+ #workspaceMain :is(.performance-year,.portfolio-month-filter,.feature-filters,.intel-controls) { gap: 10px; flex-wrap: wrap; }
+ #workspaceMain :is(.performance-year,.portfolio-month-filter) label { min-width: 0; }
+ #workspaceMain .performance-year { display: grid; grid-template-columns: 44px minmax(100px,1fr) 44px; width: 100%; }
+ #workspaceMain .performance-year>button { min-height: 48px; padding-inline: 8px; }
+}
+
+:root:not([data-theme="light"]) #workspaceMain :is(.tracking-card button,.performance-year button,.performance-calendar-actions button,.actions>button) { background: var(--workspace-soft); color: var(--text); border: 1px solid var(--line); box-shadow: none; }
+#workspaceMain :is(.performance-panel,.panel,.feature-intro) { scroll-margin-top: 100px; }
+@media(max-width:650px) { body select { font-size: 16px!important; } #workspaceMain h2 { scroll-margin-top: 105px; } }
+
+@media(max-width:650px) { #workspaceMain .workspace-jump select { font-size: 16px!important; min-height: 48px; width: 100%; } #workspaceMain :is(h2,h3)[tabindex="-1"] { scroll-margin-top: 110px; } .workspace-jump { min-width: 0; } }

@@ -80,6 +80,20 @@ class BackgroundTests(unittest.TestCase):
   with server.connect() as c:
    bg.preference(c,1,{'enabled':False});self.assertFalse(bg.status(c,1)['enabled']);self.assertTrue(bg.status(c,2)['enabled'])
    with self.assertRaises(ValueError):bg.preference(c,1,{'enabled':'true'})
+ def test_unpriced_account_can_retry_same_day(self):
+  def unavailable(c,uid):return [] if uid==1 else server.snapshots(c,uid)
+  with patch('providers.market_prices',return_value={'ETH':{'price':'100','updated_at':self.now}}):
+   first=bg.run(server.connect,unavailable,now=self.now)
+  self.assertFalse(first['ok']);self.assertEqual(first['unpriced'],1)
+  with server.connect() as c:
+   status=c.execute('SELECT last_day,last_success,error FROM portfolio_tracking WHERE user_id=1').fetchone()
+   self.assertIsNone(status['last_day']);self.assertIsNone(status['last_success']);self.assertIn('retry',status['error'])
+  second=self.run_job();self.assertTrue(second['ok']);self.assertEqual(second['saved'],1)
+  with server.connect() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM portfolio_daily_values').fetchone()[0],2)
+ def test_primary_and_recovery_schedule_are_registered(self):
+  config=json.loads(Path('vercel.json').read_text(encoding='utf-8'))
+  jobs=[r['schedule'] for r in config['crons'] if r['path']==bg.PATH]
+  self.assertEqual(jobs,[bg.SCHEDULE,bg.RECOVERY_SCHEDULE])
  def test_invalid_quotes_not_zero(self):
   for p in (None,True,'NaN','-1'):
    self.assertIsNone(bg.fresh_quote({'price':p,'updated_at':self.now},self.now))

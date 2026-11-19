@@ -1,6 +1,6 @@
 # Daily portfolio tracking
 
-The production schedule invokes GET /api/cron/portfolio-daily during the 23:00 UTC hour every day. No user session is required. Vercel must have a server-only CRON_SECRET (32Ã¢â‚¬â€œ256 URL-safe letters/digits/underscore/hyphen) before deploying this change. Vercel sends it as an Authorization Bearer header. Missing/wrong secrets are rejected before hosted database initialization. Never put this secret in client code or a URL.
+The production schedule invokes GET /api/cron/portfolio-daily during the 21:00 UTC hour every day, with a recovery invocation in the 23:00 UTC hour. No user session is required. Vercel must have a server-only CRON_SECRET (32Ã¢â‚¬â€œ256 URL-safe letters/digits/underscore/hyphen) before deploying this change. Vercel sends it as an Authorization Bearer header. Missing/wrong secrets are rejected before hosted database initialization. Never put this secret in client code or a URL.
 
 Each connected account is enabled by default and can pause/resume daily tracking in the Portfolio gain & loss calendar. The UI shows configuration and last successful automatic capture. Local development does not have an automatic scheduler merely because the server is running.
 
@@ -33,3 +33,5 @@ The calendar now includes a saved-value chart with 30-day, 90-day and all-histor
 Capture errors are isolated by account. A failed account rolls back its transaction, gets a generic private error/attempt timestamp when storage permits, remains eligible for retry, and does not stop later owners. Saved/unpriced counts increment only after commit. Optional invalid token metadata does not stop the global contract-quote prefetch; an affected owner's invalid saved state is handled as an account error. The cron aggregate includes failed count and returns non-success when any account fails, keeping the daily run resumable.
 
 Validation: 593 Python tests passed (21 optional skips). History/health/export regressions check invalid/future dates, missing values, range selection, disjoint chart paths, neutralized CSV fields, paused/overdue/error copy and escaping. Synthetic browser QA verified CSV content and filename, pause/resume, 390px/desktop layouts and empty browser error logs. Demo charts contain synthetic history, not backfilled user values.
+
+Recovery is idempotent: successful accounts are not overwritten; unpriced accounts remain eligible. Unpriced captures return a non-success result and retain their last successful timestamp. Recovery does not backfill historical days or synchronize new balances. Separate daily jobs respect the per-job daily schedule limit.
