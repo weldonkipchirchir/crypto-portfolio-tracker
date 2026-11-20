@@ -3,7 +3,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "excludeFiles": "{.git/**,**/*.sqlite3*,**/*.db*,**/*.bak,**/*.pre-upgrade,**/*backup,test_*,__pycache__/**,.env*}"
+      "excludeFiles": "{.git/**,.agents/**,tests/**,docs/**,scripts/test*,scripts/load_test.py,**/*.sqlite3*,**/*.db*,**/*.bak,**/*.pre-upgrade,**/*backup,**/__pycache__/**,.env*}"
     }
   },
   "rewrites": [
@@ -16,7 +16,7 @@
   "regions": [
     "fra1"
   ],
-  "buildCommand": "python build_static.py",
+  "buildCommand": "python scripts/build_static.py",
   "headers": [
     {
       "source": "/",

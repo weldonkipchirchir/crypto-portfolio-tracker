@@ -1,8 +1,8 @@
 """Vercel entry point. No ephemeral SQLite fallback in hosted mode."""
 import os,threading,time
-from server import Handler,init
-import portfolio_background
-import cloud_storage
+from backend.server import Handler, init
+from backend.portfolio import portfolio_background
+from backend.storage import cloud_storage
 _ready=False
 _lock=threading.Lock()
 def initialize():

@@ -8,3 +8,9 @@
 __pycache__
 test_*
 *.test.cjs
+
+tests/
+docs/
+.agents/
+skills-lock.json
+**/__pycache__/

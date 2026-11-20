@@ -1,0 +1,5 @@
+const {readProjectFile}=require('./helpers/project.cjs');
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');const c={window:{},Intl,Date,console};vm.createContext(c);vm.runInContext(readProjectFile('portfolio_performance.js','utf8'),c);const p=c.window.OrbitPerformance;
+for(const value of ['=1',' +SUM(A1:A2)','\ufeff  @demo','-command','\tplain','\rplain','\nplain'])assert.equal(p.spreadsheetText(value),"'"+value);
+for(const value of ['Main exchange','  Savings','BTC','2026-01-01',0,-12,1.5])assert.equal(p.spreadsheetText(value),value);
+const csv=p.holdingsCsv([{symbol:'BTC',source:'ledger',label:'  =1',quantity:1,price:2,value:2,average_buy:3,average_cost:3,unrealized:-1}]);assert(csv.includes('"\'  =1"'));assert(csv.includes('"-1"'));assert(!csv.includes('"\'-1"'));console.log('CSV text hardening covers whitespace/BOM/control prefixes and preserves numeric losses.');

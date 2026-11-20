@@ -1,0 +1,53 @@
+from backend.core.paths import PROJECT_ROOT, source_path
+"""Explicit public asset allowlist; never publish the repository directory."""
+STATIC_FILES={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/portfolio_insights.js':('portfolio_insights.js','text/javascript; charset=utf-8'),'/styles.css':('styles.css','text/css; charset=utf-8'),'/advanced_dashboard.js':('advanced_dashboard.js','text/javascript; charset=utf-8'),'/advanced_dashboard.css':('advanced_dashboard.css','text/css; charset=utf-8'),'/target_dashboard.js':('target_dashboard.js','text/javascript; charset=utf-8'),'/target_dashboard.css':('target_dashboard.css','text/css; charset=utf-8'),'/market_dashboard.js':('market_dashboard.js','text/javascript; charset=utf-8'),'/market_dashboard.css':('market_dashboard.css','text/css; charset=utf-8'),'/market_intelligence.js':('market_intelligence.js','text/javascript; charset=utf-8'),'/trade_chart_markers.js':('trade_chart_markers.js','text/javascript; charset=utf-8'),'/market_intelligence.css':('market_intelligence.css','text/css; charset=utf-8')}
+for filename in ('indicator_library.js','studio_storage.js','chart_panels.js','pine_bridge.js','pine_editor.js','coin_alerts.js','experience_ui.js','chart_tools.js','experience_ui.css','chart_tools.css'):
+ STATIC_FILES['/'+filename]=(filename,('text/javascript' if filename.endswith('.js') else 'text/css')+'; charset=utf-8')
+
+# Crawlable public content, separate from the authenticated workspace.
+for filename in ('crypto-portfolio-tracker.html', 'guides/crypto-profit-loss.html', 'guides/wallet-tracking.html', 'about-orbit.html'):
+ STATIC_FILES["/"+filename]=(filename,"text/html; charset=utf-8")
+STATIC_FILES.update({"/public_site.css":("public_site.css","text/css; charset=utf-8"),"/robots.txt":("robots.txt","text/plain; charset=utf-8"),"/sitemap.xml":("sitemap.xml","application/xml; charset=utf-8")})
+
+STATIC_FILES.update({"/app.html":("app.html","text/html; charset=utf-8"),"/favicon.svg":("favicon.svg","image/svg+xml"),"/orbit-preview.png":("orbit-preview.png","image/png")})
+
+STATIC_FILES["/favicon.ico"]=("favicon.ico","image/x-icon")
+for filename in ("favicon-32.png","favicon-48.png","favicon-96.png","apple-touch-icon.png","favicon-192.png","favicon-512.png"):
+ STATIC_FILES["/"+filename]=(filename,"image/png")
+
+STATIC_FILES.update({"/guides/import-crypto-trades-csv.html":("guides/import-crypto-trades-csv.html","text/html; charset=utf-8"),"/examples/orbit-trades.csv":("examples/orbit-trades.csv","text/csv; charset=utf-8")})
+
+STATIC_FILES["/workspace_polish.css"]=("workspace_polish.css","text/css; charset=utf-8")
+
+STATIC_FILES["/combo_dashboard.js"]=("combo_dashboard.js","text/javascript; charset=utf-8")
+
+STATIC_FILES["/portfolio_overview.js"]=("portfolio_overview.js","text/javascript; charset=utf-8")
+
+STATIC_FILES["/portfolio_performance.js"]=("portfolio_performance.js","text/javascript; charset=utf-8")
+
+STATIC_FILES['/market_discovery.js']=('market_discovery.js','text/javascript; charset=utf-8')
+
+STATIC_FILES['/footprint_ui.js']=('footprint_ui.js','text/javascript; charset=utf-8')
+
+STATIC_FILES['/landing.css']=('landing.css','text/css; charset=utf-8')
+
+from backend.features.roadmap_features import IDS as FEATURE_IDS
+for filename in ['feature_workspace.js','feature_workspace.css']+['feature_'+identity+'.js' for identity in FEATURE_IDS]:
+ STATIC_FILES['/'+filename]=(filename,('text/javascript' if filename.endswith('.js') else 'text/css')+'; charset=utf-8')
+
+STATIC_FILES['/analytics-architecture.svg']=('analytics-architecture.svg','image/svg+xml')
+
+STATIC_FILES['/landing_theme.js']=('landing_theme.js','text/javascript; charset=utf-8')
+
+STATIC_FILES['/theme_system.css']=('theme_system.css','text/css; charset=utf-8')
+
+# Bundled CC0 images: no remote image proxy or external image requests.
+import json as _asset_json
+from pathlib import Path as _AssetPath
+for _logo in _asset_json.loads(source_path("coin_logos_manifest.json").read_text(encoding="utf-8")):
+ STATIC_FILES["/coin-logos/"+_logo]=("coin-logos/"+_logo,"image/png")
+for _script in ("phone_picker.js","coin_icons.js"):
+ STATIC_FILES["/"+_script]=(_script,"text/javascript; charset=utf-8")
+
+# Filesystem layout is separate from the public URL contract.
+STATIC_FILES={url:(source_path(filename).relative_to(PROJECT_ROOT).as_posix(),kind) for url,(filename,kind) in STATIC_FILES.items()}
