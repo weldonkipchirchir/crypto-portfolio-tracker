@@ -27,3 +27,15 @@ const tableView=ui.bubbles({coins:largeCoins,stale:true},'24h',250,{motion:'tabl
 (async()=>{let pending=[];const h={innerHTML:'',querySelector:()=>null},handle=ui.mount(h,{listings:()=>new Promise(resolve=>pending.push(resolve))});handle.refresh();pending[1]({coins:[{id:'new',name:'New current feed',symbol:'NEW',price_change_percentage_24h:1}]});await flush();assert(h.innerHTML.includes('New current feed'));pending[0]({coins:[{id:'old',name:'Old delayed feed',symbol:'OLD',price_change_percentage_24h:1}]});await flush();assert(!h.innerHTML.includes('Old delayed feed'));handle.refresh();const saved=h.innerHTML;handle.destroy();pending[2]({coins:[]});await flush();assert.equal(h.innerHTML,saved);assert.equal(h.onclick,null);assert.equal(h.oninput,null);console.log('Bubbles: strict numeric/date inputs, source units, readable table and async refresh cleanup verified.');})().catch(e=>{console.error(e);process.exitCode=1});
 
 assert.equal(ui.bubbleRows({coins:[{id:'x',price_change_percentage_24h:1,stale:true}]}).length,0);const negativePrice=ui.bubbles({coins:[{id:'x',name:'X',symbol:'X',current_price:-1,price_change_percentage_24h:1}]},'24h',20,{motion:'table'});assert(negativePrice.includes('Unavailable'));assert(!negativePrice.includes('-$1'));const flatSeries={points:new Map([['2024-01-01',1],['2024-01-02',1]]),days:['2024-01-01','2024-01-02'],first:'2024-01-01',last:'2024-01-02',source:'coingecko',quote:'USD'};const flatView=ui.returnsView(flatSeries,{start:'2024-01-01',end:'2024-01-02'});assert(!/NaN|Infinity/.test(flatView));assert(flatView.includes('55.00,140.00'));
+
+const fitCoins=Array.from({length:500},(_,i)=>({id:'fit-'+i,symbol:'F'+i,name:'Fit '+i,current_price:1,price_change_percentage_24h:(i%17)-8}));
+for(const count of [20,50,100,250,500]){
+ const fitted=ui.bubbles({coins:fitCoins},'24h',count,{motion:'floating'});assert.equal(fitted,ui.bubbles({coins:fitCoins},'24h',count,{motion:'floating'}),'paths stay stable across renders');
+ for(const m of fitted.matchAll(/<g class="discovery-bubble[^>]*style="([^"]+)"[^>]*>[\s\S]*?<circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"/g)){
+  const [,style,cx,cy,r]=m;assert(+cx-+r>=0&&+cx + +r<=900);assert(+cy-+r>=0&&+cy + +r<=540,'grid fits without hidden rows');
+  const coord=(axis,k)=>+style.match(new RegExp('--bubble-'+axis+k+':(-?[\\d.]+)px'))[1];
+  for(let k=0;k<=32;k++){const x=+cx+coord('x',k),y=+cy+coord('y',k);assert(x>=+r&&x<=900-r);assert(y>=+r&&y<=540-r)}
+  assert(Math.abs(coord('x',0)-coord('x',32))<.01);assert(Math.abs(coord('y',0)-coord('y',32))<.01);
+ }
+}
+console.log('20–500 coins: packed bounds, all 33 motion samples, stable paths and seamless loop closure passed.');

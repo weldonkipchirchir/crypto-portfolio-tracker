@@ -273,3 +273,68 @@ body select, #workspaceMain select, dialog select, #auth select {
  #workspaceMain .portfolio-controls label { grid-column:1/-1; justify-content:flex-start; margin:0; }
 }
 @media(max-width:360px) { #workspaceMain .portfolio-controls { grid-template-columns:minmax(0,1fr); } }
+
+/* Coin artwork owns its circle. Remove the unrelated green ring and baseline offset. */
+:root .market-icon:has(.coin-logo),:root[data-theme="light"] .market-icon:has(.coin-logo) { display:grid; place-items:center; box-sizing:border-box; width:36px; height:36px; padding:0; margin:0; border:0; background:transparent; overflow:hidden; }
+:root .market-icon .coin-logo { display:block; width:32px; height:32px; margin:0; padding:0; border:0; }
+:root .market-icon.large:has(.coin-logo) { width:54px; height:54px; }
+:root .market-icon.large .coin-logo { width:48px; height:48px; }
+.market-table-wrap table { border-collapse:collapse; }
+.market-table-wrap :is(th,td) { border-bottom:1px solid color-mix(in srgb,var(--line) 60%,transparent); border-inline:0; }
+.market-table-wrap tbody tr:last-child td { border-bottom:0; }
+.market-table-wrap :is(th,td):first-child { text-align:center; padding-inline:12px; }
+.market-rank { display:inline-grid; place-items:center; min-width:28px; min-height:28px; font-size:12px; font-variant-numeric:tabular-nums; color:var(--muted); }
+.market-coin-button { align-items:center; border-radius:8px; }
+.market-coin-button:focus-visible { outline:2px solid var(--info); outline-offset:4px; }
+/* Fit every selected coin in the chart; no nested horizontal or vertical scrolling. */
+.discovery-bubble-scroll { overflow:hidden; max-height:none; width:100%; }
+.discovery-bubble-scroll .discovery-bubbles { min-width:0; width:100%; height:auto; aspect-ratio:5/3; margin:0; overflow:hidden; }
+.discovery-bubble { animation-name:discovery-orbit; animation-timing-function:linear; }
+@keyframes discovery-orbit {
+0.0% { transform:translate(var(--bubble-x0,0px),var(--bubble-y0,0px)); }
+3.125% { transform:translate(var(--bubble-x1,0px),var(--bubble-y1,0px)); }
+6.25% { transform:translate(var(--bubble-x2,0px),var(--bubble-y2,0px)); }
+9.375% { transform:translate(var(--bubble-x3,0px),var(--bubble-y3,0px)); }
+12.5% { transform:translate(var(--bubble-x4,0px),var(--bubble-y4,0px)); }
+15.625% { transform:translate(var(--bubble-x5,0px),var(--bubble-y5,0px)); }
+18.75% { transform:translate(var(--bubble-x6,0px),var(--bubble-y6,0px)); }
+21.875% { transform:translate(var(--bubble-x7,0px),var(--bubble-y7,0px)); }
+25.0% { transform:translate(var(--bubble-x8,0px),var(--bubble-y8,0px)); }
+28.125% { transform:translate(var(--bubble-x9,0px),var(--bubble-y9,0px)); }
+31.25% { transform:translate(var(--bubble-x10,0px),var(--bubble-y10,0px)); }
+34.375% { transform:translate(var(--bubble-x11,0px),var(--bubble-y11,0px)); }
+37.5% { transform:translate(var(--bubble-x12,0px),var(--bubble-y12,0px)); }
+40.625% { transform:translate(var(--bubble-x13,0px),var(--bubble-y13,0px)); }
+43.75% { transform:translate(var(--bubble-x14,0px),var(--bubble-y14,0px)); }
+46.875% { transform:translate(var(--bubble-x15,0px),var(--bubble-y15,0px)); }
+50.0% { transform:translate(var(--bubble-x16,0px),var(--bubble-y16,0px)); }
+53.125% { transform:translate(var(--bubble-x17,0px),var(--bubble-y17,0px)); }
+56.25% { transform:translate(var(--bubble-x18,0px),var(--bubble-y18,0px)); }
+59.375% { transform:translate(var(--bubble-x19,0px),var(--bubble-y19,0px)); }
+62.5% { transform:translate(var(--bubble-x20,0px),var(--bubble-y20,0px)); }
+65.625% { transform:translate(var(--bubble-x21,0px),var(--bubble-y21,0px)); }
+68.75% { transform:translate(var(--bubble-x22,0px),var(--bubble-y22,0px)); }
+71.875% { transform:translate(var(--bubble-x23,0px),var(--bubble-y23,0px)); }
+75.0% { transform:translate(var(--bubble-x24,0px),var(--bubble-y24,0px)); }
+78.125% { transform:translate(var(--bubble-x25,0px),var(--bubble-y25,0px)); }
+81.25% { transform:translate(var(--bubble-x26,0px),var(--bubble-y26,0px)); }
+84.375% { transform:translate(var(--bubble-x27,0px),var(--bubble-y27,0px)); }
+87.5% { transform:translate(var(--bubble-x28,0px),var(--bubble-y28,0px)); }
+90.625% { transform:translate(var(--bubble-x29,0px),var(--bubble-y29,0px)); }
+93.75% { transform:translate(var(--bubble-x30,0px),var(--bubble-y30,0px)); }
+96.875% { transform:translate(var(--bubble-x31,0px),var(--bubble-y31,0px)); }
+100.0% { transform:translate(var(--bubble-x32,0px),var(--bubble-y32,0px)); }
+}
+@media(prefers-reduced-motion:reduce) { .discovery-bubble-scroll .discovery-bubble { animation:none; transform:none; } }
+@media(max-width:650px) {
+ .discovery-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; }
+ .discovery-controls>label { min-width:0; max-width:100%; width:100%; }
+ .discovery-controls>.phone-select-trigger,.discovery-controls>button { min-width:0; width:100%; }
+ .discovery-controls .phone-select-trigger { min-width:0; width:100%; }
+ .discovery-controls .phone-select-trigger>span:first-child { min-width:0; }
+}
+@media(max-width:650px) {
+ #workspaceMain .market-table-wrap :is(th,td):first-child { box-sizing:border-box; width:40px!important; min-width:40px; padding-inline:4px; }
+ #workspaceMain .market-table-wrap th:first-child { font-size:9px; letter-spacing:0; }
+ #workspaceMain .market-rank { min-width:24px; }
+}

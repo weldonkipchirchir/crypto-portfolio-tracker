@@ -241,7 +241,7 @@ class Handler(BaseHTTPRequestHandler):
   self.send_header('X-Frame-Options','DENY')
   self.send_header('Referrer-Policy','no-referrer')
   self.send_header('Cache-Control','no-store')
-  self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'".replace("connect-src 'self';", "connect-src 'self' wss://ws.okx.com:8443;" if self.path.split("?",1)[0]=="/app.html" else "connect-src 'self';"))
+  self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https://coin-images.coingecko.com https://assets.coingecko.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'".replace("connect-src 'self';", "connect-src 'self' wss://ws.okx.com:8443;" if self.path.split("?",1)[0]=="/app.html" else "connect-src 'self';"))
   super().end_headers()
  def valid_host(self):
   try: host=urlsplit('//'+self.headers.get('Host','')).hostname
