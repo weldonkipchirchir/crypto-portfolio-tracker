@@ -230,3 +230,46 @@ body select, #workspaceMain select, dialog select, #auth select {
 @media(max-width:650px) { body select { font-size: 16px!important; } #workspaceMain h2 { scroll-margin-top: 105px; } }
 
 @media(max-width:650px) { #workspaceMain .workspace-jump select { font-size: 16px!important; min-height: 48px; width: 100%; } #workspaceMain :is(h2,h3)[tabindex="-1"] { scroll-margin-top: 110px; } .workspace-jump { min-width: 0; } }
+/* Custom mobile selection sheets retain the original select as the data source. */
+.phone-select-trigger { display:none; }
+.phone-picker-sheet { box-sizing:border-box; width:min(520px,100%); max-width:100%; max-height:82dvh; margin:auto auto 0; padding:0; border:1px solid var(--line); border-radius:22px 22px 0 0; background:var(--panel); color:var(--text); box-shadow:0 -16px 60px #00000040; overflow:hidden; }
+.phone-picker-sheet[open] { display:flex; flex-direction:column; }
+.phone-picker-sheet::backdrop { background:#050b14a8; backdrop-filter:blur(4px); }
+.phone-picker-sheet>header { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 20px 12px; flex-shrink:0; }
+.phone-picker-sheet h2 { font-size:19px; line-height:1.4; margin:0; }
+.phone-picker-sheet>input { box-sizing:border-box; width:calc(100% - 32px); margin:4px 16px 12px; min-height:48px; padding:12px 14px; font-size:16px; border:1px solid var(--line); border-radius:12px; color:var(--text); background:var(--workspace-soft); flex-shrink:0; }
+.phone-picker-options { overflow-y:auto; overscroll-behavior:contain; padding:0 12px 12px; }
+.phone-picker-options>button { display:flex; align-items:center; text-align:left; width:100%; min-height:54px; padding:14px 12px; margin:4px 0; gap:8px; border:1px solid transparent; border-radius:12px; color:var(--text); background:transparent; font-size:16px; line-height:1.4; white-space:normal; }
+.phone-picker-options>button[aria-pressed="true"] { background:var(--workspace-soft); border-color:var(--info); }
+.phone-picker-options>button:disabled { opacity:.45; cursor:not-allowed; }
+.phone-picker-options small { color:var(--muted); font-size:12px; }
+.phone-picker-check { margin-left:auto; color:var(--info); font-weight:700; }
+.phone-picker-sheet>header button,.phone-picker-done { min-height:44px; padding:10px 16px; border:1px solid var(--line); border-radius:10px; color:var(--text); background:var(--workspace-soft); font-size:14px; }
+.phone-picker-done { margin:8px 16px calc(16px + env(safe-area-inset-bottom)); flex-shrink:0; }
+.phone-picker-sheet:has(>.phone-picker-options:last-child) { padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+.phone-picker-sheet :is(button,input):focus-visible { outline:2px solid var(--info); outline-offset:2px; }
+.coin-logo { width:32px; height:32px; object-fit:contain; flex:none; display:inline-block; vertical-align:middle; border-radius:50%; }
+.performance-avatar:has(.coin-logo),.market-icon:has(.coin-logo) { background:transparent; padding:0; }
+.market-icon.large .coin-logo { width:48px; height:48px; }
+.holdings-tile-head b,.experience-workspace .performance-asset { display:inline-flex; align-items:center; gap:9px; }
+@media(max-width:650px) {
+ body select.phone-select-source { display:none!important; }
+ body .phone-select-trigger { box-sizing:border-box; display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:48px; max-width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:12px; color:var(--text); background:var(--panel); font-size:15px; line-height:1.45; text-align:left; }
+ .phone-select-trigger>span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+ .phone-select-trigger>span:last-child { flex:none; color:var(--muted); }
+ #workspaceMain :is(.actions,.heading-actions,.portfolio-refresh-actions) { gap:8px; flex-wrap:wrap; }
+ #workspaceMain :is(.actions>button,.tracking-card button,.portfolio-calendar-actions>button), #workspaceMain [data-portfolio-refresh], #workspaceMain [data-portfolio-auto] { min-height:44px; padding:10px 14px; font-size:13px; line-height:1.4; border-radius:11px; white-space:normal; }
+ #workspaceMain .performance-year>label { min-width:0; }
+ .workspace-jump { flex-wrap:wrap; }
+ .workspace-jump>.phone-select-trigger { flex:1 1 200px; }
+}
+
+.phone-select-trigger[hidden] { display:none!important; }
+@media(max-width:650px) {
+ #workspaceMain .portfolio-hero-main { display:flex; flex-direction:column; gap:18px; }
+ #workspaceMain .portfolio-hero-main>div { box-sizing:border-box; width:100%; min-width:0; }
+ #workspaceMain .portfolio-controls { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; max-width:none; gap:8px; }
+ #workspaceMain .portfolio-controls button { box-sizing:border-box; width:100%; min-width:0; min-height:46px; padding:10px 8px; font-size:13px; line-height:1.35; }
+ #workspaceMain .portfolio-controls label { grid-column:1/-1; justify-content:flex-start; margin:0; }
+}
+@media(max-width:360px) { #workspaceMain .portfolio-controls { grid-template-columns:minmax(0,1fr); } }

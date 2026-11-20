@@ -39,3 +39,11 @@ STATIC_FILES['/analytics-architecture.svg']=('analytics-architecture.svg','image
 STATIC_FILES['/landing_theme.js']=('landing_theme.js','text/javascript; charset=utf-8')
 
 STATIC_FILES['/theme_system.css']=('theme_system.css','text/css; charset=utf-8')
+
+# Bundled CC0 images: no remote image proxy or external image requests.
+import json as _asset_json
+from pathlib import Path as _AssetPath
+for _logo in _asset_json.loads((_AssetPath(__file__).parent/"coin_logos_manifest.json").read_text(encoding="utf-8")):
+ STATIC_FILES["/coin-logos/"+_logo]=("coin-logos/"+_logo,"image/png")
+for _script in ("phone_picker.js","coin_icons.js"):
+ STATIC_FILES["/"+_script]=(_script,"text/javascript; charset=utf-8")

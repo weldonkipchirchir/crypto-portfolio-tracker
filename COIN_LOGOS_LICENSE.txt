@@ -1,0 +1,5 @@
+Cryptocurrency Icons 0.18.1
+Source: https://github.com/spothq/cryptocurrency-icons
+License: CC0-1.0 (public domain dedication)
+https://creativecommons.org/publicdomain/zero/1.0/
+Artwork credited to Cryptocurrency Icons contributors. Coin trademarks belong to their respective owners.
