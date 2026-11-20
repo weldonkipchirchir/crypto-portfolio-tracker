@@ -31,11 +31,14 @@ function enhanceMarketTables(doc){
  doc.querySelectorAll('.market-table-wrap').forEach(wrap=>{
  if(wrap.previousElementSibling?.classList.contains('experience-table-controls'))return;
  const controls=doc.createElement('div');controls.className='experience-table-controls';
- const hint=doc.createElement('span');hint.textContent='Mobile view · rank, coin, price and 24h change';
- const button=doc.createElement('button');button.type='button';button.textContent='Show all columns';button.setAttribute('aria-pressed','false');
+ const hint=doc.createElement('span');hint.textContent='All columns · swipe horizontally for more';
+ const button=doc.createElement('button');button.type='button';button.textContent='Show compact view';button.setAttribute('aria-pressed','true');
+ wrap.classList.add('experience-full-table');
  wrap.setAttribute('tabindex','0');wrap.setAttribute('role','region');wrap.setAttribute('aria-label','Ranked cryptocurrency market data');
  button.onclick=()=>{const full=wrap.classList.toggle('experience-full-table');button.textContent=full?'Show compact view':'Show all columns';button.setAttribute('aria-pressed',String(full));hint.textContent=full?'All columns · swipe horizontally for more':'Mobile view · rank, coin, price and 24h change'};
- controls.append(hint,button);wrap.before(controls);
+ const arrows=doc.createElement('div');arrows.className='experience-table-scroll';
+ for(const [direction,label] of [[-1,'Scroll market columns left'],[1,'Scroll market columns right']]){const arrow=doc.createElement('button');arrow.type='button';arrow.textContent=direction<0?'←':'→';arrow.setAttribute('aria-label',label);arrow.onclick=()=>wrap.scrollBy({left:direction*Math.max(180,wrap.clientWidth*.8),behavior:'smooth'});arrows.append(arrow)}
+ controls.append(hint,button,arrows);wrap.before(controls);
  });
 }
 

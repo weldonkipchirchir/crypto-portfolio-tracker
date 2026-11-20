@@ -380,3 +380,20 @@ body select, #workspaceMain select, dialog select, #auth select {
 .portfolio-heatmap-legend .flat { background:#315d9c; }
 .portfolio-heatmap-legend .unknown { background:#64748b; }
 @media(max-width:650px) { .market-category-tabs { gap:7px; } .market-category-tabs button { min-height:44px; padding:10px 12px; font-size:12px; } }
+
+/* Mobile markets: bounded names and a horizontally scrollable complete table. */
+@media(max-width:650px) {
+ #workspaceMain .market-table-wrap { max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; }
+ #workspaceMain .market-table-wrap.experience-full-table table { table-layout:fixed; width:1120px; min-width:1120px; }
+ #workspaceMain .market-table-wrap.experience-full-table :is(th,td):nth-child(2) { width:230px; }
+ #workspaceMain .market-table-wrap.experience-full-table :is(th,td):nth-child(n+3) { width:140px; text-align:right; white-space:nowrap; }
+ #workspaceMain .market-table-wrap .market-coin-button { min-width:0; width:100%; max-width:100%; gap:8px; white-space:normal; }
+ #workspaceMain .market-table-wrap .market-coin-button>span:last-child { min-width:0; flex:1; overflow:hidden; }
+ #workspaceMain .market-table-wrap .market-coin-button b { display:block; white-space:normal; overflow-wrap:anywhere; line-height:1.45; }
+ #workspaceMain .market-table-wrap .market-coin-button small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+ #workspaceMain .market-table-wrap .market-icon { flex:0 0 28px; width:28px; height:28px; }
+ #workspaceMain .market-table-wrap:not(.experience-full-table) :is(th,td):nth-child(2) { overflow:hidden; }
+ #workspaceMain .market-table-wrap:not(.experience-full-table) .market-coin-button { overflow:hidden; }
+}
+
+@media(max-width:650px) { .experience-table-controls { flex-wrap:wrap; } .experience-table-scroll { display:flex; gap:8px; margin-left:auto; } .experience-table-scroll button { min-width:44px; min-height:44px; font-size:18px; } }
