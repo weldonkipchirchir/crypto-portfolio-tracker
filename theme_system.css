@@ -338,3 +338,29 @@ body select, #workspaceMain select, dialog select, #auth select {
  #workspaceMain .market-table-wrap th:first-child { font-size:9px; letter-spacing:0; }
  #workspaceMain .market-rank { min-width:24px; }
 }
+/* One aligned identity treatment across portfolios, data, analytics and forms. */
+.coin-identity,.coin-label { display:inline-flex; align-items:center; gap:8px; min-width:0; vertical-align:middle; }
+.coin-identity>.coin-logo,.coin-label>.coin-logo { width:24px; height:24px; flex:none; }
+.coin-identity>span,.coin-label>span { min-width:0; }
+.coin-logo-small { width:22px; height:22px; }
+.coin-logo[data-logo-kind="unknown"],.coin-svg-logo[data-logo-kind="unknown"] { filter:grayscale(1); opacity:.65; }
+:root .token:has(.coin-logo),:root .advanced-token-icon:has(.coin-logo) { display:inline-grid; place-items:center; background:transparent; border:0; padding:0; flex:none; }
+:root .token .coin-logo,:root .advanced-token-icon .coin-logo { display:block; width:28px; height:28px; margin:0; }
+.performance-table .coin-identity,.advanced-table-wrap .coin-identity,.targets-table-wrap .coin-identity { vertical-align:middle; }
+.coin-identity-heading { display:flex; align-items:center; gap:10px; }
+.coin-identity-heading>.coin-logo { width:30px; height:30px; }
+.intel-rsi-comparison>button { grid-template-columns:100px minmax(0,1fr) 50px; }
+.phone-picker-options>.coin-logo { flex:none; }
+@media(max-width:650px) { .intel-rsi-comparison>button { grid-template-columns:86px minmax(0,1fr) 36px; } .coin-identity,.coin-label { gap:6px; } .coin-identity>.coin-logo,.coin-label>.coin-logo { width:22px; height:22px; } }
+.coin-identity>span,.coin-label>span { overflow-wrap:anywhere; }
+.phone-select-trigger>.phone-select-icon { width:24px; height:24px; flex:none; }
+.phone-select-trigger>.phone-select-value { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.trade-bar-row>.coin-identity { min-width:0; }
+.network-tile>.coin-identity .coin-logo { width:22px; height:22px; }
+.trade-bar-row { grid-template-columns:100px minmax(0,1fr) 140px; }
+.trade-bar-row>.coin-identity { width:100%; }
+.trade-bar-row>.coin-identity>span { overflow-wrap:anywhere; }
+#importPreview .coin-logo,.connection details p>.coin-logo { width:20px; height:20px; margin-right:5px; }
+@media(max-width:650px) { .trade-bar-row { grid-template-columns:82px minmax(0,1fr) 100px; } }
+.phone-picker-options>button>span:not(.phone-picker-check) { flex:1; min-width:0; overflow-wrap:anywhere; }
+.phone-picker-options>button>.phone-picker-check { flex:none; }
