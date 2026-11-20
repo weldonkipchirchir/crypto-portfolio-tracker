@@ -384,9 +384,15 @@ body select, #workspaceMain select, dialog select, #auth select {
 /* Mobile markets: bounded names and a horizontally scrollable complete table. */
 @media(max-width:650px) {
  #workspaceMain .market-table-wrap { max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; }
- #workspaceMain .market-table-wrap.experience-full-table table { table-layout:fixed; width:1120px; min-width:1120px; }
- #workspaceMain .market-table-wrap.experience-full-table :is(th,td):nth-child(2) { width:230px; }
- #workspaceMain .market-table-wrap.experience-full-table :is(th,td):nth-child(n+3) { width:140px; text-align:right; white-space:nowrap; }
+ #workspaceMain .market-table-wrap.experience-full-table { --market-name-width:clamp(104px,calc(100vw - 244px),160px); }
+ #workspaceMain .market-table-wrap.experience-full-table table { table-layout:fixed; width:calc(var(--market-name-width) + 720px); min-width:calc(var(--market-name-width) + 720px); }
+ #workspaceMain .market-table-wrap.experience-full-table .market-col-rank { width:32px; }
+ #workspaceMain .market-table-wrap.experience-full-table .market-col-name { width:var(--market-name-width); }
+ #workspaceMain .market-table-wrap.experience-full-table .market-col-price { width:88px; }
+ #workspaceMain .market-table-wrap.experience-full-table .market-col-data { width:120px; }
+ #workspaceMain .market-table-wrap.experience-full-table :is(th,td) { box-sizing:border-box; padding-inline:6px; }
+ #workspaceMain .market-table-wrap.experience-full-table :is(th,td):first-child { width:32px!important; min-width:32px; }
+ #workspaceMain .market-table-wrap.experience-full-table :is(th,td):nth-child(n+3) { text-align:right; white-space:nowrap; }
  #workspaceMain .market-table-wrap .market-coin-button { min-width:0; width:100%; max-width:100%; gap:8px; white-space:normal; }
  #workspaceMain .market-table-wrap .market-coin-button>span:last-child { min-width:0; flex:1; overflow:hidden; }
  #workspaceMain .market-table-wrap .market-coin-button b { display:block; white-space:normal; overflow-wrap:anywhere; line-height:1.45; }
