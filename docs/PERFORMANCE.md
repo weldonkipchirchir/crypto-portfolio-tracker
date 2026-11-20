@@ -34,7 +34,7 @@ Async clients released together; arrival scheduling is OS-dependent. Separate se
 ## Re-run
 
 ```powershell
-python load_test.py --output performance-local.json
+python scripts/load_test.py --output performance-local.json
 ```
 
 The tool binds only to loopback and uses a temporary SQLite fixture. It offers no remote target option. The fixture is removed on normal completion. Tokens are never written to the report.

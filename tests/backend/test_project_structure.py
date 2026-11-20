@@ -10,6 +10,13 @@ class ProjectStructureTests(unittest.TestCase):
   self.assertTrue(issubclass(handler,server.Handler))
   self.assertIs(importlib.import_module('server').main,server.main)
   self.assertEqual(server.ROOT,PROJECT_ROOT)
+ def test_test_runner_import_has_no_process_side_effects(self):
+  import os,socket
+  before=dict(os.environ);connect=socket.socket.connect;cwd=Path.cwd()
+  importlib.import_module('scripts.test_backend')
+  self.assertEqual(dict(os.environ),before)
+  self.assertIs(socket.socket.connect,connect)
+  self.assertEqual(Path.cwd(),cwd)
  def test_static_boundary_remains_frontend_only(self):
   for url,(filename,kind) in STATIC_FILES.items():
    path=(PROJECT_ROOT/filename).resolve()
