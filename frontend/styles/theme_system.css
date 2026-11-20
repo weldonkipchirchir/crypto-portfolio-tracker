@@ -364,3 +364,19 @@ body select, #workspaceMain select, dialog select, #auth select {
 @media(max-width:650px) { .trade-bar-row { grid-template-columns:82px minmax(0,1fr) 100px; } }
 .phone-picker-options>button>span:not(.phone-picker-check) { flex:1; min-width:0; overflow-wrap:anywhere; }
 .phone-picker-options>button>.phone-picker-check { flex:none; }
+/* Market discovery categories are visible controls, with a clear active state in both themes. */
+.market-category-panel { display:grid; gap:12px; }
+.market-category-tabs { display:flex; flex-wrap:wrap; gap:8px; }
+.market-category-tabs button { min-height:42px; padding:10px 15px; border:1px solid var(--line); border-radius:999px; color:var(--muted); background:var(--panel); font-size:13px; }
+.market-category-tabs button[aria-pressed="true"] { background:var(--workspace-soft); color:var(--text); border-color:var(--info); box-shadow:inset 0 -2px var(--info); }
+.market-category-tabs button:focus-visible { outline:2px solid var(--info); outline-offset:3px; }
+.market-category-note { margin:0; padding:14px 16px; border:1px solid var(--line); border-radius:12px; background:var(--workspace-soft); color:var(--muted); font-size:13px; line-height:1.7; }
+.market-category-note b { color:var(--text); }
+.portfolio-heatmap-legend { display:flex; flex-wrap:wrap; gap:12px 20px; margin:16px 0; font-size:13px; }
+.portfolio-heatmap-legend span { display:inline-flex; align-items:center; gap:7px; }
+.portfolio-heatmap-legend i { width:16px; height:16px; border-radius:4px; }
+.portfolio-heatmap-legend .gain { background:#16734b; }
+.portfolio-heatmap-legend .loss { background:#b73838; }
+.portfolio-heatmap-legend .flat { background:#315d9c; }
+.portfolio-heatmap-legend .unknown { background:#64748b; }
+@media(max-width:650px) { .market-category-tabs { gap:7px; } .market-category-tabs button { min-height:44px; padding:10px 12px; font-size:12px; } }

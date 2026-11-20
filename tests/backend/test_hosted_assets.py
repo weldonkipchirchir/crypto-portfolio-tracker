@@ -22,6 +22,15 @@ class HostedAssetsTests(unittest.TestCase):
     with self.assertRaises(urllib.error.HTTPError) as error:urllib.request.urlopen(f'http://127.0.0.1:{server.server_port}/.env')
     self.assertEqual(error.exception.code,404)
   finally:server.shutdown();server.server_close();thread.join()
+ def test_cloud_workspace_labels_follow_logical_filename_after_moves(self):
+  from unittest.mock import patch
+  server=ThreadingHTTPServer(('127.0.0.1',0),handler)
+  thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+  try:
+   with patch.dict('os.environ',{'VERCEL':'1'}),patch('api.index.initialize',side_effect=RuntimeError('No DB needed')):
+    with urllib.request.urlopen(f'http://127.0.0.1:{server.server_port}/app.html') as response:
+     body=response.read().decode();self.assertIn('Personal cloud edition',body);self.assertNotIn('Local development edition',body)
+  finally:server.shutdown();server.server_close();thread.join()
  def test_persistent_cache_hydrates_worker(self):
   from backend.markets import coin_market; import time
   key=('detail','hosted-cache-regression')

@@ -279,7 +279,7 @@ class Handler(BaseHTTPRequestHandler):
   static=STATIC_FILES
   if self.path in static:
    filename,kind=static[self.path];body=(ROOT/filename).read_bytes();
-   if filename=='app.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
+   if Path(filename).name=='app.html' and os.environ.get('VERCEL')=='1':body=body.replace(b'Local development edition',b'Personal cloud edition').replace(b'Local workspace',b'Cloud workspace').replace(b'Private local accounts',b'Private cloud accounts').replace(b'Development edition',b'Personal preview')
    self.send_response(200); self.send_header('Content-Type',kind); self.end_headers(); self.wfile.write(body); return
   if self.path!='/api/state': self.send(404,{'error':'Not found'}); return
   with connect() as c:
@@ -339,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
      if market_action:
       c.commit()
       with coin_market.persistence(market_cache_read,market_cache_write):
-       if self.path=='/api/market-listings':result={**coin_market.listings(),'exchange_coin_ids':sorted(exchange_charts.ASSETS)}
+       if self.path=='/api/market-listings':result={**(coin_market.listings() if raw.get('category','all')=='all' else coin_market.market_listings(raw.get('category'))),'exchange_coin_ids':sorted(exchange_charts.ASSETS)}
        elif self.path=='/api/market-quote':result=market_quotes.quote(raw.get('coin_id'),raw.get('source','coingecko'))
        elif self.path=='/api/market-detail':result=coin_market.detail(raw.get('coin_id'))
        elif self.path=='/api/market-chart':

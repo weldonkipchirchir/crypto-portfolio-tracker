@@ -64,3 +64,14 @@ Live implementation checks: BinanceBTCUSDT ALL returned480weeklycandles fromAugu
 
 ## Chart readability and inspection
 Both renderers share five price gridlines and up to five date/time ticks placed at actual observations. Intraday windows show dates and24-hour times; long windows include years. The chart is full-width, with a horizontally contained minimum readable width on small screens. Local/UTC selection updates axes, exact timestamp readout, visible-period status and observation table without fetching new data. Pointer movement locates the nearest real timestamp using binary search; a keyboard/touch observation slider provides the same date/time/price or OHLC readout and crosshair. Source/coverage details remain accessible in an expandable section. The valuation snapshot grid sits below the chart. Focused UI tests cover UTC labels, year labels, inspection, quote units, zoom and existing race protections.
+
+
+## Market category tabs
+
+Markets provides All assets, Trending, local top gainers/losers, Tokenized stocks, Prediction markets, RWA, AI, DeFi, Memes, Stablecoins, Layer 1 and Layer 2 views. Gainers and losers use only the loaded top-500 sample. Trending uses CoinGecko search popularity, not price gains. Category lists use CoinGecko taxonomy and can contain unranked assets; unknown ranks and market caps stay unavailable. Tokenized stock quotes are not an underlying stock-exchange feed. Prediction-market tokens are not event odds.
+
+Feeds are bounded, cached and validated before use. Newly discovered coin IDs remain eligible for detail pages through the server's persisted category catalog. A category failure never silently replaces its rows with the global coin list. Logos retain exact provider identities and the shared safe fallback.
+
+Sources: [CoinGecko category filtering](https://docs.coingecko.com/reference/coins-markets), [trending search](https://docs.coingecko.com/reference/trending-search), [tokenized stocks](https://www.coingecko.com/en/categories/tokenized-stock), [prediction markets](https://www.coingecko.com/en/categories/prediction-markets).
+
+The portfolio allocation heatmap uses fresh market returns for market-change colours independently of balance age. Area still reflects saved holdings, with stale-balance warnings. Personal unrealized-return colours continue to require fresh positions and verified recorded cost. Grey means unavailable; it never means zero.

@@ -12,7 +12,10 @@ NARRATIVES={
  'ai':('Artificial Intelligence (AI)','artificial-intelligence'),
  'defi':('Decentralized Finance (DeFi)','decentralized-finance-defi'),
  'gaming':('Gaming','gaming'),'meme':('Meme','meme-token'),
- 'layer1':('Layer 1','layer-1'),'layer2':('Layer 2','layer-2')}
+ 'layer1':('Layer 1','layer-1'),'layer2':('Layer 2','layer-2'),
+ 'stocks':('Tokenized stocks','tokenized-stock'),
+ 'prediction':('Prediction markets','prediction-markets'),
+ 'stablecoins':('Stablecoins','stablecoins')}
 # Deliberate exclusions, not symbol guesses; this list cannot classify every new wrapper.
 EXCLUDED=set('tether usd-coin dai ethena-usde usds first-digital-usd paypal-usd true-usd frax usdd usual-usd ripple-usd global-dollar usd1 wrapped-bitcoin wrapped-steth staked-ether wrapped-eeth coinbase-wrapped-btc binance-staked-sol jupiter-staked-sol renzo-restaked-eth ether-fi-staked-eth rocket-pool-eth mantle-staked-ether susds ethena-staked-usde pax-gold tether-gold'.split())
 RSI_ASSETS=('bitcoin','ethereum','solana','ripple','dogecoin','chainlink','cardano','avalanche-2')
@@ -49,7 +52,7 @@ def breadth():
   if not isinstance(raw,list) or not 1<=len(raw)<=100:raise ValueError('Invalid breadth response')
   seen=set();valid=[]
   for item in raw:
-   row=m.coin_row(item)
+   row=m.coin_row(item,require_rank=False)
    if row and row['id'] not in seen:
     seen.add(row['id']);valid.append((row,m.numeric(item.get('price_change_percentage_30d_in_currency'),True)))
   bitcoin=next((v for row,v in valid if row['id']=='bitcoin'),None)
@@ -75,15 +78,14 @@ def narratives(slug):
  if not isinstance(slug,str) or slug not in NARRATIVES:raise ValueError('Unsupported narrative')
  name,category=NARRATIVES[slug]
  def load():
-  raw=m.request('/coins/markets?'+urlencode({'vs_currency':'usd','order':'market_cap_desc','per_page':250,'page':1,'sparkline':'false','price_change_percentage':'24h,7d','category':category}))
-  if not isinstance(raw,list) or not 1<=len(raw)<=250:raise ValueError('Invalid category response')
+  raw=m.request('/coins/markets?'+urlencode({'vs_currency':'usd','order':'market_cap_desc','per_page':250,'page':1,'sparkline':'false','price_change_percentage':'24h,7d,30d','category':category}))
+  if not isinstance(raw,list) or not 0<=len(raw)<=250:raise ValueError('Invalid category response')
   rows=[];seen=set()
   for item in raw:
-   row=m.coin_row(item)
+   row=m.coin_row(item,require_rank=False)
    if row and row['id'] not in seen:seen.add(row['id']);rows.append(row)
-  if not rows:raise ValueError('No ranked category coins available')
-  rows.sort(key=lambda r:r['market_cap_rank'])
-  return {'narrative':{'id':slug,'name':name,'category_id':category},'coins':rows,'coverage':'CoinGecko category taxonomy; up to 250 ranked assets. Categories overlap and are not an endorsement. This is a discovery list, not a complete sector census.'}
+  rows.sort(key=lambda r:(r['market_cap_rank'] or 100001,r['id']))
+  return {'narrative':{'id':slug,'name':name,'category_id':category},'coins':rows,'coverage':'CoinGecko category taxonomy; up to 250 assets. Unreported ranks or market caps remain unavailable. Categories overlap and are not an endorsement. This is a discovery list, not a complete sector census.'}
  return m.cached(('fundamentals','intelligence-narrative',slug),900,load)
 
 def venues(coin_id):
@@ -208,8 +210,7 @@ def alt_season():
 def catalog_coin(identity):
  """Read validated previously discovered category rows, without upstream requests."""
  identity=m.identifier(identity);now=time.time()
- for slug in NARRATIVES:
-  key=('fundamentals','intelligence-narrative',slug)
+ for key in [('fundamentals','intelligence-narrative',slug) for slug in NARRATIVES]+[('fundamentals','markets-trending-v1')]:
   with m.LOCK:
    saved=m.CACHE.get(key);payload=saved[1] if saved else None
    callbacks=getattr(m.STORE,'callbacks',None)
@@ -223,9 +224,10 @@ def catalog_coin(identity):
   if not isinstance(coins,list) or len(coins)>250:continue
   for raw in coins:
    if not isinstance(raw,dict) or raw.get('id')!=identity:continue
-   row=m.coin_row(raw)
+   row=m.coin_row(raw,require_rank=False)
    if row:
     row['price_change_percentage_7d']=m.numeric(raw.get('price_change_percentage_7d'),True)
+    row['price_change_percentage_30d']=m.numeric(raw.get('price_change_percentage_30d'),True)
     return row
  return None
 

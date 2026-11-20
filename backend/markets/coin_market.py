@@ -113,12 +113,13 @@ def cached(key,ttl,loader,force=False):
    except Exception:pass
   return copy.deepcopy(data)
 
-def coin_row(raw):
+def coin_row(raw,*,require_rank=True):
  if not isinstance(raw,dict):return None
  try:identity=identifier(raw.get('id'))
  except ValueError:return None
  rank=raw.get('market_cap_rank')
- if isinstance(rank,bool) or not isinstance(rank,int) or not 1<=rank<=100000:return None
+ if isinstance(rank,bool) or not isinstance(rank,int) or not 1<=rank<=100000:
+  if require_rank or rank is not None:return None
  row={'id':identity,'name':text(raw.get('name'),100),'symbol':text(raw.get('symbol'),24).upper(),'image':url(raw.get('image')),'market_cap_rank':rank,'last_updated':stamp(raw.get('last_updated'))}
  if not row['name'] or not row['symbol']:return None
  for field in ('current_price','market_cap','total_volume','circulating_supply','total_supply','max_supply','fully_diluted_valuation','ath','atl'):
@@ -147,6 +148,31 @@ def listings(force=False):
   return {'coins':rows,'availability':dict(AVAILABILITY),'partial':partial,'coverage':'Top 500 provider-ranked coins; '+('additional provider page unavailable; showing available coins.' if partial else 'available rows may be fewer.')}
  return cached(('list','periods-v3-500'),300,load,force)
 
+def market_listings(section='all'):
+ if not isinstance(section,str):raise ValueError('Choose a supported market category')
+ if section=='all':return listings()
+ from backend.markets import market_intelligence
+ if section in market_intelligence.NARRATIVES:return market_intelligence.narratives(section)
+ if section!='trending':raise ValueError('Choose a supported market category')
+ def load():
+  raw=request('/search/trending')
+  items=raw.get('coins') if isinstance(raw,dict) else None
+  if not isinstance(items,list) or len(items)>100:raise ValueError('Invalid trending response')
+  ids=[]
+  for entry in items[:30]:
+   try:identity=identifier(entry['item']['id'])
+   except (ValueError,TypeError,KeyError):continue
+   if identity not in ids:ids.append(identity)
+   if len(ids)>=15:break
+  rows=[]
+  if ids:
+   values=request('/coins/markets?'+urlencode({'vs_currency':'usd','ids':','.join(ids),'per_page':100,'page':1,'sparkline':'false','price_change_percentage':'24h,7d,30d'}))
+   if not isinstance(values,list) or len(values)>100:raise ValueError('Invalid trending market response')
+   by_id={r['id']:r for v in values if (r:=coin_row(v,require_rank=False)) and r['id'] in ids}
+   rows=[by_id[i] for i in ids if i in by_id]
+  return {'coins':rows,'section':'trending','coverage':'CoinGecko most-searched coins over the last 24 hours, in provider trending order. Not a ranking of price gain or investment quality.'}
+ return cached(('fundamentals','markets-trending-v1'),300,load)
+
 def allowed(coin_id):
  identity=identifier(coin_id)
  try:known=any(c['id']==identity for c in listings()['coins'])
@@ -167,7 +193,7 @@ def detail(coin_id):
   raw['image']=(payload.get('image') or {}).get('large')
   for field in ('current_price','market_cap','total_volume','fully_diluted_valuation','ath','atl'):raw[field]=(market.get(field) or {}).get('usd')
   for field in ('circulating_supply','total_supply','max_supply','price_change_percentage_24h'):raw[field]=market.get(field)
-  row=coin_row(raw)
+  row=coin_row(raw,require_rank=False)
   if not row:raise ValueError('Invalid coin detail')
   platforms=payload.get('platforms',{})
   row['platforms']={k:v for k,v in platforms.items() if isinstance(k,str) and re.fullmatch(r'[a-z0-9-]{1,80}',k) and isinstance(v,str) and 1<=len(v)<=100} if isinstance(platforms,dict) else {}

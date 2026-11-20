@@ -13,6 +13,14 @@ class MarketsAPITests(test_integrations.APITests):
   with self.assertRaises(urllib.error.HTTPError):self.call(self.a,'market-chart',{'coin_id':'bitcoin','source':'bad'})
   with patch('backend.markets.market_news.news',return_value={'articles':[]}):self.assertEqual(self.call(self.a,'market-news',{'coin_id':'bitcoin'})['articles'],[])
   with patch('backend.markets.protocol_data.fundamentals',return_value={'coin_id':'bitcoin'}):self.assertEqual(self.call(self.a,'market-fundamentals',{'coin_id':'bitcoin'})['coin_id'],'bitcoin')
+ def test_category_route_auth_and_validation(self):
+  with patch('backend.markets.coin_market.market_listings',return_value={'coins':[{'id':'stock-token','market_cap_rank':None}]}) as listing:
+   with self.assertRaises(urllib.error.HTTPError):self.call(self.client(),'market-listings',{'category':'stocks'})
+   listing.assert_not_called()
+   result=self.call(self.a,'market-listings',{'category':'stocks'})
+   self.assertEqual(result['coins'][0]['id'],'stock-token');listing.assert_called_once_with('stocks')
+  with self.assertRaises(urllib.error.HTTPError) as error:self.call(self.a,'market-listings',{'category':'../secret'})
+  self.assertEqual(error.exception.code,400)
  def test_quote_route(self):
   with self.assertRaises(urllib.error.HTTPError):self.call(self.client(),'market-quote',{'coin_id':'bitcoin'})
   with patch('backend.markets.market_quotes.quote',return_value={'coin_id':'bitcoin','price':'100','quote_currency':'USDT'}) as quote:
